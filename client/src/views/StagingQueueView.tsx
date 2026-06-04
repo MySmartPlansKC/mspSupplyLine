@@ -606,7 +606,6 @@ export default function StagingQueueView() {
                   variant="danger"
                   className="w-full justify-center font-semibold"
                   onClick={() => setPurgeConfirmOpen(true)}
-                  loading={purgeBusy}
                   disabled={purgeBusy}
                 >
                   Clean Data & Reset Node

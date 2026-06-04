@@ -56,7 +56,6 @@ export default function ConfirmModal({
             type="button"
             variant={confirmVariant}
             loading={loading}
-            disabled={loading}
             onClick={onConfirm}
           >
             {confirmLabel}

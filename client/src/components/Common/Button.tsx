@@ -31,6 +31,30 @@ const sizeClasses: Record<ButtonSize, string> = {
   md: 'h-8 px-3 text-sm',
 };
 
+/** Spinner track/accent tuned for each button surface while loading. */
+const loadingSpinnerClasses: Record<ButtonVariant, string> = {
+  primary: 'border-white/35 border-t-white',
+  success: 'border-white/35 border-t-white',
+  danger: 'border-white/35 border-t-white',
+  secondary: 'border-slate-500 border-t-slate-200',
+  ghost: 'border-slate-300 border-t-slate-700',
+  link: 'border-slate-300 border-t-current',
+};
+
+/** Keep full color while loading — avoid the washed-out disabled look. */
+const loadingActiveClasses: Record<ButtonVariant, string> = {
+  primary: 'disabled:bg-blue-600! disabled:opacity-100',
+  success: 'disabled:bg-emerald-600! disabled:opacity-100',
+  danger: 'disabled:bg-red-600! disabled:opacity-100',
+  secondary: 'disabled:bg-slate-800! disabled:opacity-100',
+  ghost: 'disabled:bg-white disabled:opacity-100',
+  link: 'disabled:opacity-100',
+};
+
+function joinClasses(...values: Array<string | undefined | false>): string {
+  return values.filter(Boolean).join(' ');
+}
+
 export default function Button({
   variant = 'primary',
   size = 'md',
@@ -48,11 +72,23 @@ export default function Button({
 
   return (
     <button
-      className={`${base} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
+      className={joinClasses(
+        base,
+        variantClasses[variant],
+        sizeClasses[size],
+        loading && loadingActiveClasses[variant],
+        loading && 'cursor-wait',
+        className
+      )}
       disabled={isDisabled}
+      aria-busy={loading || undefined}
       {...props}
     >
-      {loading ? <Spinner size="sm" className="text-current" /> : leftIcon}
+      {loading ? (
+        <Spinner size="sm" className={loadingSpinnerClasses[variant]} />
+      ) : (
+        leftIcon
+      )}
       {children}
     </button>
   );
