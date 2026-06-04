@@ -19,8 +19,8 @@ export default function LoginView() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState(import.meta.env.VITE_DEV_LOGIN_EMAIL ?? '');
+  const [password, setPassword] = useState(import.meta.env.VITE_DEV_LOGIN_PASSWORD ?? '');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
