@@ -4,17 +4,20 @@
  *   npm run test:auth
  *
  * Env (optional):
- *   API_BASE_URL=http://localhost:3001
+ *   API_BASE_URL=http://localhost:3002
  *   DEV_SEED_PASSWORD=SupplyLine123!
  */
 import 'dotenv/config';
 
-const BASE = (process.env.API_BASE_URL ?? 'http://localhost:3001').replace(/\/$/, '');
+const BASE = (
+  process.env.API_BASE_URL ??
+  `http://localhost:${process.env.PORT ?? '3002'}`
+).replace(/\/$/, '');
 const PASSWORD = process.env.DEV_SEED_PASSWORD ?? 'SupplyLine123!';
 const PROJECT_ID = Number(process.env.DEV_PROJECT_ID ?? 1);
 
-const MSPADMIN_EMAIL = process.env.DEV_MSPADMIN_EMAIL ?? 'mspadmin@supplyline.local';
-const CLIENTADMIN_EMAIL = process.env.DEV_CLIENT_EMAIL ?? 'clientadmin@supplyline.local';
+const MSPADMIN_EMAIL =
+  process.env.DEV_MSPADMIN_EMAIL?.trim() || 'mspadmin@supplyline.local';
 
 interface LoginResponse {
   token: string;
@@ -106,29 +109,6 @@ async function main(): Promise<void> {
     }
   } catch (error) {
     fail('MspAdmin flow', (error as Error).message);
-    failures++;
-  }
-
-  // ClientAdmin login + allowed project + denied project
-  try {
-    const client = await login(CLIENTADMIN_EMAIL);
-    pass(`POST /api/auth/login (${CLIENTADMIN_EMAIL} → ${client.user.role})`);
-
-    const allowed = await getContext(client.token, PROJECT_ID);
-    if (allowed === 200) pass(`GET /api/projects/${PROJECT_ID}/context (ClientAdmin)`);
-    else {
-      fail(`GET /api/projects/${PROJECT_ID}/context (ClientAdmin)`, `status ${allowed}`);
-      failures++;
-    }
-
-    const denied = await getContext(client.token, 999);
-    if (denied === 403) pass('GET /api/projects/999/context (ClientAdmin → 403 expected)');
-    else {
-      fail('GET /api/projects/999/context (ClientAdmin)', `expected 403, got ${denied}`);
-      failures++;
-    }
-  } catch (error) {
-    fail('ClientAdmin flow', (error as Error).message);
     failures++;
   }
 

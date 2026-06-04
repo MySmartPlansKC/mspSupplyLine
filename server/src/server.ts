@@ -10,11 +10,19 @@ initSupplylinePool();
 
 const app = express();
 const port = Number(process.env.PORT ?? 3001);
-const corsOrigin = process.env.CORS_ORIGIN ?? 'http://localhost:5173';
+
+function parseCorsOrigins(): string | string[] {
+  const raw = process.env.CORS_ORIGIN ?? 'http://localhost:5173';
+  const origins = raw
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return origins.length === 1 ? origins[0] : origins;
+}
 
 app.use(
   cors({
-    origin: corsOrigin,
+    origin: parseCorsOrigins(),
     credentials: true,
   })
 );

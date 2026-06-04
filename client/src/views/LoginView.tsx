@@ -19,8 +19,8 @@ export default function LoginView() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [email, setEmail] = useState('mspadmin@supplyline.local');
-  const [password, setPassword] = useState('SupplyLine123!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 

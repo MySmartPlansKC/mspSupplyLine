@@ -1,12 +1,13 @@
 /**
- * Dev-only seed: client, project, platform user, client user + project access.
+ * Dev-only seed: client, project, and MspAdmin platform user.
  *
  *   npm run seed:dev
  *
  * Env overrides (optional):
  *   DEV_SEED_PASSWORD
  *   DEV_MSPADMIN_EMAIL
- *   DEV_CLIENT_EMAIL
+ *   DEV_MSPADMIN_FIRST_NAME
+ *   DEV_MSPADMIN_LAST_NAME
  */
 import 'dotenv/config';
 import { initSupplylinePool, execute, query } from '../../config/database';
@@ -16,32 +17,45 @@ import { hashPassword } from '../utilities/password';
 
 const CLIENT_ID = '11111111-1111-4111-8111-111111111111';
 const MSPADMIN_USER_ID = '22222222-2222-4222-8222-222222222222';
-const CLIENTADMIN_USER_ID = '33333333-3333-4333-8333-333333333333';
-const ACCESS_ID = '44444444-4444-4444-8444-444444444444';
 
+const DEFAULT_EMAIL = 'mspadmin@supplyline.local';
 const DEFAULT_PASSWORD = 'SupplyLine123!';
-const MSPADMIN_EMAIL = process.env.DEV_MSPADMIN_EMAIL ?? 'mspadmin@supplyline.local';
-const CLIENTADMIN_EMAIL = process.env.DEV_CLIENT_EMAIL ?? 'clientadmin@supplyline.local';
+const DEFAULT_FIRST = 'Dev';
+const DEFAULT_LAST = 'MspAdmin';
 
 interface CountRow extends RowDataPacket {
   count: number;
 }
 
+function envOrDefault(value: string | undefined, fallback: string): string {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : fallback;
+}
+
 async function seedDevUser(): Promise<void> {
   initSupplylinePool();
 
-  const password = process.env.DEV_SEED_PASSWORD ?? DEFAULT_PASSWORD;
+  const mspAdminEmail = envOrDefault(process.env.DEV_MSPADMIN_EMAIL, DEFAULT_EMAIL);
+  const mspAdminFirst = envOrDefault(
+    process.env.DEV_MSPADMIN_FIRST_NAME,
+    DEFAULT_FIRST
+  );
+  const mspAdminLast = envOrDefault(
+    process.env.DEV_MSPADMIN_LAST_NAME,
+    DEFAULT_LAST
+  );
+  const password = envOrDefault(process.env.DEV_SEED_PASSWORD, DEFAULT_PASSWORD);
   const passwordHash = await hashPassword(password);
+  const port = process.env.PORT ?? '3002';
 
   const existing = await query<CountRow[]>(
-    `SELECT COUNT(*) AS count FROM sl_Users WHERE Email IN (?, ?)`,
-    [MSPADMIN_EMAIL, CLIENTADMIN_EMAIL]
+    `SELECT COUNT(*) AS count FROM sl_Users WHERE Email = ?`,
+    [mspAdminEmail]
   );
 
   if (existing[0].count > 0) {
-    console.log('Dev users already exist — skipping seed.');
-    console.log(`  MspAdmin:    ${MSPADMIN_EMAIL}`);
-    console.log(`  ClientAdmin: ${CLIENTADMIN_EMAIL}`);
+    console.log('Dev MspAdmin already exists — skipping seed.');
+    console.log(`  MspAdmin: ${mspAdminEmail}`);
     return;
   }
 
@@ -67,8 +81,8 @@ async function seedDevUser(): Promise<void> {
       '64108',
       'SupplyLine Dev Client',
       'PO-DEV-001',
-      'Dev MspAdmin',
-      MSPADMIN_EMAIL,
+      `${mspAdminFirst} ${mspAdminLast}`,
+      mspAdminEmail,
       '+18165550000',
     ]
   );
@@ -83,34 +97,12 @@ async function seedDevUser(): Promise<void> {
     [
       MSPADMIN_USER_ID,
       CLIENT_ID,
-      MSPADMIN_EMAIL,
+      mspAdminEmail,
       passwordHash,
-      'Dev',
-      'MspAdmin',
+      mspAdminFirst,
+      mspAdminLast,
       UserRole.MspAdmin,
     ]
-  );
-
-  await execute(
-    `INSERT INTO sl_Users (
-       UserID, ClientID, Email, PasswordHash, FirstName, LastName,
-       PreferredLocale, Role, IsActive
-     ) VALUES (?, ?, ?, ?, ?, ?, 'en-US', ?, 1)`,
-    [
-      CLIENTADMIN_USER_ID,
-      CLIENT_ID,
-      CLIENTADMIN_EMAIL,
-      passwordHash,
-      'Dev',
-      'ClientAdmin',
-      UserRole.ClientAdmin,
-    ]
-  );
-
-  await execute(
-    `INSERT INTO sl_UserProjectAccess (AccessID, UserID, ProjectID)
-     VALUES (?, ?, ?)`,
-    [ACCESS_ID, CLIENTADMIN_USER_ID, projectId]
   );
 
   console.log('Dev seed completed.');
@@ -118,12 +110,12 @@ async function seedDevUser(): Promise<void> {
   console.log(`  ProjectID: ${projectId}`);
   console.log(`  Password:  ${password}`);
   console.log('');
-  console.log('Users:');
-  console.log(`  MspAdmin (${UserRole.MspAdmin}):    ${MSPADMIN_EMAIL}`);
-  console.log(`  ClientAdmin (${UserRole.ClientAdmin}): ${CLIENTADMIN_EMAIL}`);
+  console.log(`  MspAdmin (${UserRole.MspAdmin}): ${mspAdminEmail}`);
   console.log('');
   console.log('Login: POST /api/auth/login');
-  console.log(`  curl -X POST http://localhost:3001/api/auth/login -H "Content-Type: application/json" -d "{\\"email\\":\\"${MSPADMIN_EMAIL}\\",\\"password\\":\\"${password}\\"}"`);
+  console.log(
+    `  curl -X POST http://localhost:${port}/api/auth/login -H "Content-Type: application/json" -d "{\\"email\\":\\"${mspAdminEmail}\\",\\"password\\":\\"${password}\\"}"`
+  );
 }
 
 seedDevUser().catch((error: Error) => {

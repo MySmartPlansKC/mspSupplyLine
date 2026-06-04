@@ -25,16 +25,22 @@ function trimEnv(value: string | undefined): string {
 }
 
 function readSaturnDbConfig(): SaturnDbConfig | null {
-  const host = trimEnv(process.env.SATURN_DB_HOST);
+  // Same VM as SupplyLine: omit SATURN_DB_HOST to use MARIA_DB_HOST (localhost / 127.0.0.1).
+  const host =
+    trimEnv(process.env.SATURN_DB_HOST) ||
+    trimEnv(process.env.MARIA_DB_HOST) ||
+    'localhost';
   const user = trimEnv(process.env.SATURN_DB_USER);
   const password = process.env.SATURN_DB_PASSWORD;
   const database = trimEnv(process.env.SATURN_DB_NAME);
 
-  if (!host || !user || password === undefined || !database) {
+  if (!user || password === undefined || !database) {
     return null;
   }
 
-  const port = Number(process.env.SATURN_DB_PORT ?? 3306);
+  const port = Number(
+    process.env.SATURN_DB_PORT ?? process.env.MARIA_DB_PORT ?? 3306
+  );
   if (!Number.isFinite(port) || port <= 0) {
     return null;
   }
@@ -93,7 +99,7 @@ export function initSaturnPool(): Pool {
   const config = readSaturnDbConfig();
   if (!config) {
     throw new Error(
-      'Saturn read pool is not configured. Set SATURN_DB_HOST, SATURN_DB_USER, SATURN_DB_PASSWORD, and SATURN_DB_NAME.'
+      'Saturn read pool is not configured. Set SATURN_DB_USER, SATURN_DB_PASSWORD, and SATURN_DB_NAME (SATURN_DB_HOST optional — defaults to MARIA_DB_HOST).'
     );
   }
 
