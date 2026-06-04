@@ -7,21 +7,20 @@ import ProjectSubNavTabs from '../components/Common/ProjectSubNavTabs';
 import { FetchWrapperError, fetchWrapper } from '../api/fetchWrapper';
 import Button from '../components/Common/Button';
 import Badge, {
+  formatProcessingStatusLabel,
+  formatReviewStatusLabel,
   processingStatusBadgeVariant,
   reviewStatusBadgeVariant,
+  type ProcessingStatus,
 } from '../components/Common/Badge';
 import Card from '../components/Common/Card';
 import { Spinner } from '../components/Common/Spinner';
 
 const LEDGER_GRID_COLS =
-  'grid grid-cols-[100px_140px_1fr_80px_140px_320px] gap-4 w-full';
+  'grid grid-cols-[100px_140px_1fr_80px_140px_minmax(22rem,1fr)] gap-4 w-full';
 
-type ProcessingStatus =
-  | 'Pending'
-  | 'Processing'
-  | 'AwaitingReview'
-  | 'Completed'
-  | 'Error';
+/** Row actions — default Button size/weight; equal columns in the Actions cell. */
+const LEDGER_ACTION_BTN = 'shadow-none w-full';
 
 interface SubmittalDocument {
   documentId: string;
@@ -264,25 +263,29 @@ export default function StagingQueueView() {
   const documentRows = useMemo(
     () =>
       documents.map((doc) => (
-        <div
+        <li
           key={doc.documentId}
-          className="border-b border-slate-200/70 border-l-2 border-l-slate-600 p-3 last:border-b-0"
+          className="flex flex-col gap-2 border-b border-slate-200/70 px-3 py-3 last:border-b-0"
         >
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-semibold">{doc.fileTitle}</span>
+          <div className="flex items-start justify-between gap-3">
+            <span className="min-w-0 flex-1 font-medium leading-snug text-slate-900">
+              {doc.fileTitle}
+            </span>
             <Badge
               variant={processingStatusBadgeVariant(doc.processingStatus)}
               loading={doc.processingStatus === 'Processing'}
+              uppercase={false}
+              className="shrink-0"
             >
-              {doc.processingStatus}
+              {formatProcessingStatusLabel(doc.processingStatus)}
             </Badge>
           </div>
           {doc.processingStatus === 'Error' && doc.errorMessage ? (
-            <p className="mt-2 rounded border-l-2 border-red-500 bg-red-50/80 px-2 py-1.5">
+            <p className="rounded border border-red-200 bg-red-50 px-2.5 py-1.5 text-sm text-red-800">
               {doc.errorMessage}
             </p>
           ) : null}
-        </div>
+        </li>
       )),
     [documents]
   );
@@ -331,9 +334,10 @@ export default function StagingQueueView() {
                   <span role="cell">
                     <Badge
                       variant={reviewStatusBadgeVariant(item.reviewStatus)}
-                      className="inline-flex shrink-0"
+                      uppercase={false}
+                      className="shrink-0"
                     >
-                      {item.reviewStatus}
+                      {formatReviewStatusLabel(item.reviewStatus)}
                     </Badge>
                   </span>
                   <span
@@ -362,23 +366,36 @@ export default function StagingQueueView() {
                   >
                     {item.locationInBuilding ?? 'Not specified'}
                   </span>
-                  <span
-                    className="flex flex-wrap items-center justify-end gap-2.5"
-                    role="cell"
-                  >
-                    <Button type="button" variant="success" size="sm">
+                  <span className="grid grid-cols-4 gap-1.5" role="cell">
+                    <Button
+                      type="button"
+                      variant="success"
+                      size="sm"
+                      className={LEDGER_ACTION_BTN}
+                    >
                       Approve
                     </Button>
-                    <Button type="button" variant="danger" size="sm">
+                    <Button
+                      type="button"
+                      variant="danger"
+                      size="sm"
+                      className={LEDGER_ACTION_BTN}
+                    >
                       Reject
                     </Button>
-                    <Button type="button" variant="secondary" size="sm">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className={LEDGER_ACTION_BTN}
+                    >
                       Edit
                     </Button>
                     <Button
                       type="button"
                       variant="secondary"
                       size="sm"
+                      className={LEDGER_ACTION_BTN}
                       onClick={() => setPayloadModalItem(item)}
                     >
                       Inspect
@@ -502,22 +519,21 @@ export default function StagingQueueView() {
         {!loading && !ledgerError ? (
           <>
             <Card
-              heading="Submittal Document Registry"
-              subheading={`${documents.length} document(s) on permanent processing log`}
+              heading="Submittals"
+              subheading={
+                documents.length === 0
+                  ? 'No PDFs ingested for this project yet.'
+                  : `${documents.length} PDF${documents.length === 1 ? '' : 's'}`
+              }
               className="overflow-hidden"
               noBodyPadding
             >
-              <div className="border-b border-slate-200/70 px-3 pt-3">
-                <div className="sl-form-section-banner">Document Processing Log</div>
-              </div>
               {documents.length === 0 ? (
-                <p className="px-3 py-4 text-center italic">
-                  No submittal documents registered for this operational node.
+                <p className="px-3 py-4 text-center text-slate-500">
+                  Upload or sync a submittal to see it here.
                 </p>
               ) : (
-                <div className="flex flex-col divide-y divide-slate-200/70 border-t border-slate-200/70">
-                  {documentRows}
-                </div>
+                <ul className="border-t border-slate-200/70">{documentRows}</ul>
               )}
             </Card>
 

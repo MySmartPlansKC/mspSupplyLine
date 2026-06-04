@@ -3,9 +3,18 @@ import { Spinner } from './Spinner';
 
 export type BadgeVariant = 'success' | 'warning' | 'danger' | 'neutral';
 
+export type ProcessingStatus =
+  | 'Pending'
+  | 'Processing'
+  | 'AwaitingReview'
+  | 'Completed'
+  | 'Error';
+
 export interface BadgeProps {
   variant?: BadgeVariant;
   loading?: boolean;
+  /** Default true for registry chips; use false for readable sentence-case labels. */
+  uppercase?: boolean;
   className?: string;
   children: ReactNode;
 }
@@ -26,16 +35,29 @@ function joinClasses(...values: Array<string | undefined | false>): string {
 }
 
 /** Canonical status chip — matches project registry Active badge structure. */
+export function formatProcessingStatusLabel(status: ProcessingStatus): string {
+  const labels: Record<ProcessingStatus, string> = {
+    Pending: 'Pending',
+    Processing: 'Processing',
+    AwaitingReview: 'Awaiting review',
+    Completed: 'Completed',
+    Error: 'Error',
+  };
+  return labels[status];
+}
+
 export default function Badge({
   variant = 'neutral',
   loading = false,
+  uppercase = true,
   className = '',
   children,
 }: BadgeProps) {
   return (
     <span
       className={joinClasses(
-        'items-center rounded-sm border px-2 text-sm font-semibold uppercase',
+        'inline-flex items-center gap-1 rounded-sm border px-2 py-0.5 text-sm font-semibold',
+        uppercase ? 'uppercase tracking-wide' : 'normal-case',
         variantClasses[variant],
         className
       )}
@@ -53,21 +75,28 @@ export function projectStatusBadgeVariant(status: string | null | undefined): Ba
   return 'warning';
 }
 
-export function reviewStatusBadgeVariant(
-  status: 'Pending' | 'Approved' | 'Rejected'
-): BadgeVariant {
+export type ReviewStatus = 'Pending' | 'Approved' | 'Rejected';
+
+export function formatReviewStatusLabel(status: ReviewStatus): string {
+  const labels: Record<ReviewStatus, string> = {
+    Pending: 'Pending',
+    Approved: 'Approved',
+    Rejected: 'Rejected',
+  };
+  return labels[status];
+}
+
+export function reviewStatusBadgeVariant(status: ReviewStatus): BadgeVariant {
   if (status === 'Approved') return 'success';
   if (status === 'Rejected') return 'danger';
   return 'warning';
 }
 
-export function processingStatusBadgeVariant(
-  status: 'Pending' | 'Processing' | 'AwaitingReview' | 'Completed' | 'Error'
-): BadgeVariant {
-  if (status === 'AwaitingReview' || status === 'Completed') {
-    return status === 'Completed' ? 'neutral' : 'success';
-  }
+export function processingStatusBadgeVariant(status: ProcessingStatus): BadgeVariant {
+  if (status === 'Completed') return 'success';
   if (status === 'Error') return 'danger';
-  if (status === 'Processing') return 'warning';
+  if (status === 'Processing' || status === 'AwaitingReview' || status === 'Pending') {
+    return 'warning';
+  }
   return 'neutral';
 }

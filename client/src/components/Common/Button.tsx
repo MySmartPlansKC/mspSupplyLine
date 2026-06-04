@@ -27,7 +27,7 @@ const variantClasses: Record<ButtonVariant, string> = {
 
 /** md = standard control (default); sm = compact dense UI when explicitly passed */
 const sizeClasses: Record<ButtonSize, string> = {
-  sm: 'h-6 px-2 text-[11px]',
+  sm: 'h-7 px-2 text-xs leading-none',
   md: 'h-8 px-3 text-sm',
 };
 
@@ -44,7 +44,7 @@ export default function Button({
   const isDisabled = disabled || loading;
   const base = variant === 'link'
     ? 'inline-flex shrink-0 items-center gap-1 transition-colors duration-150 select-none cursor-pointer disabled:cursor-not-allowed'
-    : 'inline-flex shrink-0 items-center justify-center gap-1.5 rounded font-medium tracking-tight transition-colors duration-150 shadow-[0_1px_1px_rgba(0,0,0,0.03)] select-none cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:shadow-none';
+    : 'inline-flex shrink-0 items-center justify-center gap-1.5 rounded font-semibold tracking-tight transition-colors duration-150 shadow-[0_1px_1px_rgba(0,0,0,0.03)] select-none cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:shadow-none';
 
   return (
     <button

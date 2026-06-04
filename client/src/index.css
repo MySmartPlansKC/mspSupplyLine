@@ -12,9 +12,14 @@ body {
   @apply antialiased bg-zinc-200;
 }
 
-input, select, textarea, button {
+input, select, textarea {
   font-family: inherit;
   font-size: inherit;
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
   color: inherit;
 }
 

@@ -26,12 +26,7 @@ export default function AppShellHeader({
     <header className="flex h-14 w-full select-none items-center justify-between border-b border-slate-800 bg-slate-900 px-4">
       {/* Left: brand mark + dual-level page context */}
       <div className="flex min-w-0 flex-1 items-center gap-4">
-        <Logo
-          className="h-9 w-auto shrink-0"
-          showText
-          theme="dark"
-          wordmarkClassName="text-xl"
-        />
+        <Logo showText theme="dark" size="header" className="shrink-0" />
 
         <div className="flex min-w-0 flex-col justify-center border-l border-slate-700 pl-4">
           <h1

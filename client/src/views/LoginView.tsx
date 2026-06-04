@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { FetchWrapperError } from '../api/fetchWrapper';
 import Button from '../components/Common/Button';
 import Input from '../components/Common/Input';
+import Logo from '../components/Common/Logo';
 import { useAuth } from '../context/AuthContext';
 
 function toDisplayError(error: unknown): string {
@@ -46,22 +47,8 @@ export default function LoginView() {
         <div className="pointer-events-none absolute top-0 right-0 h-96 w-96 rounded-full bg-blue-600/10 blur-3xl" />
         <div className="pointer-events-none absolute bottom-0 left-0 h-96 w-96 rounded-full bg-emerald-600/10 blur-3xl" />
 
-        {/* LOGO HEADER */}
-        <div className="relative z-10 flex items-center gap-3 font-bold uppercase tracking-wider text-slate-200">
-          <svg className="h-7 w-auto" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path
-              d="M6 10C6 7.79086 7.79086 6 10 6H22C24.2091 6 26 7.79086 26 10V12H20V10H12V12H6V10Z"
-              className="fill-blue-500"
-            />
-            <rect x="2" y="14" width="28" height="4" rx="2" className="fill-emerald-500" />
-            <path
-              d="M26 22C26 24.2091 24.2091 26 22 26H10C7.79086 26 6 24.2091 6 22V20H12V22H20V20H26V22Z"
-              className="fill-blue-500"
-            />
-          </svg>
-          <span className="tracking-tight">
-            SupplyLine
-          </span>
+        <div className="relative z-10">
+          <Logo showText theme="dark" size="loginDesktop" />
         </div>
 
         {/* MISSION SUB-TEXT */}
@@ -90,20 +77,8 @@ export default function LoginView() {
       <section className="flex w-full flex-col justify-center px-6 sm:px-12 md:px-24 lg:w-1/2 xl:px-36">
         <div className="mx-auto w-full max-w-sm space-y-6">
           
-          {/* MOBILE LOGO DISPLAY */}
-          <div className="mb-2 flex items-center gap-2 lg:hidden font-bold uppercase tracking-wider text-slate-900">
-            <svg className="h-6 w-auto" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path
-                d="M6 10C6 7.79086 7.79086 6 10 6H22C24.2091 6 26 7.79086 26 10V12H20V10H12V12H6V10Z"
-                className="fill-blue-600"
-              />
-              <rect x="2" y="14" width="28" height="4" rx="2" className="fill-emerald-500" />
-              <path
-                d="M26 22C26 24.2091 24.2091 26 22 26H10C7.79086 26 6 24.2091 6 22V20H12V22H20V20H26V22Z"
-                className="fill-blue-600"
-              />
-            </svg>
-            <span className="tracking-tight">SupplyLine</span>
+          <div className="mb-2 lg:hidden">
+            <Logo showText theme="light" size="loginMobile" />
           </div>
 
           {/* SECTION HEADER BLOCK */}
