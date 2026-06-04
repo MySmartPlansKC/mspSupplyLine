@@ -7,7 +7,7 @@ import ProjectSubNavTabs from '../components/Common/ProjectSubNavTabs';
 import { fetchWrapper } from '../api/fetchWrapper';
 import Button from '../components/Common/Button';
 import Card from '../components/Common/Card';
-import { Spinner } from '../components/Common/Spinner';
+import LoadingIndicator from '../components/Common/LoadingIndicator';
 
 interface DependencyItem {
   relationshipId: string;
@@ -197,10 +197,10 @@ export default function CatalogView() {
         <ProjectBackLink />
 
         {loading ? (
-          <div className="flex items-center gap-1.5">
-            <Spinner size="sm" />
-            Aggregating multi-tenant registry assets...
-          </div>
+          <LoadingIndicator
+            label="Aggregating multi-tenant registry assets..."
+            spinnerSize="sm"
+          />
         ) : null}
 
         {error ? (

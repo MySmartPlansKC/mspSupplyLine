@@ -7,7 +7,7 @@ import {
   useState,
 } from 'react';
 import { fetchWrapper, setFetchWrapperHandlers } from '../api/fetchWrapper';
-import { Spinner } from '../components/Common/Spinner';
+import LoadingIndicator from '../components/Common/LoadingIndicator';
 
 const TOKEN_KEY = 'sl_token';
 const VIEW_MODE_KEY = 'sl_view_mode';
@@ -169,9 +169,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
         setViewModeState('admin');
       } finally {
-        if (!cancelled) {
-          setInitializing(false);
-        }
+        setInitializing(false);
       }
     }
 
@@ -208,15 +206,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     ]
   );
 
-  if (initializing) {
-    return (
-      <div className="grid min-h-screen place-items-center bg-zinc-200">
-        <Spinner size="md" />
-      </div>
-    );
-  }
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {initializing ? (
+        <LoadingIndicator placement="overlay" spinnerSize="md" />
+      ) : null}
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth(): AuthContextValue {

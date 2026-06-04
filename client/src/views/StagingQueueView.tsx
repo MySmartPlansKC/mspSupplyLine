@@ -14,6 +14,7 @@ import Badge, {
   type ProcessingStatus,
 } from '../components/Common/Badge';
 import Card from '../components/Common/Card';
+import LoadingIndicator from '../components/Common/LoadingIndicator';
 import { Spinner } from '../components/Common/Spinner';
 import ConfirmModal from '../components/Feedback/ConfirmModal';
 import { useAuth } from '../context/AuthContext';
@@ -467,10 +468,7 @@ export default function StagingQueueView() {
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start w-full px-1">
           <div className="flex min-w-0 flex-col gap-6">
             {loading ? (
-              <div className="flex items-center gap-1.5">
-                <Spinner size="sm" />
-                Loading assembly line...
-              </div>
+              <LoadingIndicator label="Loading assembly line..." spinnerSize="sm" />
             ) : null}
 
             {ledgerError ? (
@@ -543,7 +541,7 @@ export default function StagingQueueView() {
                 <div className="flex flex-col items-center justify-center gap-2 text-center">
                   {ingestBusy ? (
                     <div className="flex items-center gap-1.5 text-slate-300">
-                      <Spinner size="sm" />
+                      <Spinner size="sm" variant="brand" wellClassName="bg-slate-900/70" />
                       Processing submittal PDF...
                     </div>
                   ) : (

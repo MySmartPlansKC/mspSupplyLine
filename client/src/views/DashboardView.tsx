@@ -7,6 +7,7 @@ import Button from '../components/Common/Button';
 import Badge, { projectStatusBadgeVariant } from '../components/Common/Badge';
 import Card from '../components/Common/Card';
 import Input from '../components/Common/Input';
+import LoadingIndicator from '../components/Common/LoadingIndicator';
 import { Spinner } from '../components/Common/Spinner';
 import { useAuth } from '../context/AuthContext';
 
@@ -578,10 +579,7 @@ export default function DashboardView() {
             ) : null}
 
             {loading ? (
-              <div className="flex items-center gap-1.5">
-                <Spinner size="sm" />
-                Loading project scope...
-              </div>
+              <LoadingIndicator label="Loading project scope..." spinnerSize="sm" />
             ) : null}
 
             {error ? (

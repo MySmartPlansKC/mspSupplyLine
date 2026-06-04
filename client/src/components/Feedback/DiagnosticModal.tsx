@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import Button from '../Common/Button';
+import Logo from '../Common/Logo';
 
 export interface DiagnosticPayload {
   errorName: string;
@@ -18,6 +19,17 @@ interface DiagnosticModalProps {
   payload: DiagnosticPayload;
   onDismiss: () => void;
   onReload: () => void;
+}
+
+function formatTimestamp(iso: string): string {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date(iso));
+  } catch {
+    return iso;
+  }
 }
 
 function buildClipboardReport(payload: DiagnosticPayload): string {
@@ -39,6 +51,17 @@ function buildClipboardReport(payload: DiagnosticPayload): string {
     'Component Stack:',
     payload.componentStack ?? '(not available)',
   ].join('\n');
+}
+
+function buildCompactTechnical(payload: DiagnosticPayload): string {
+  const lines = [
+    payload.stack?.trim(),
+    payload.componentStack?.trim() ? `\nComponent trace:\n${payload.componentStack.trim()}` : null,
+    `\nURL: ${payload.url}`,
+    `Viewport: ${payload.viewport}`,
+    `Online: ${payload.online}`,
+  ].filter(Boolean);
+  return lines.join('\n');
 }
 
 async function copyFallback(text: string): Promise<void> {
@@ -63,6 +86,7 @@ export default function DiagnosticModal({
 }: DiagnosticModalProps) {
   const [copyState, setCopyState] = useState<'idle' | 'success' | 'error'>('idle');
   const report = useMemo(() => buildClipboardReport(payload), [payload]);
+  const compactTechnical = useMemo(() => buildCompactTechnical(payload), [payload]);
 
   async function handleCopyDetails() {
     try {
@@ -78,49 +102,68 @@ export default function DiagnosticModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[1000] grid place-items-center bg-slate-900/60 p-3" role="presentation">
+    <div
+      className="fixed inset-0 z-[1000] grid place-items-center bg-slate-950/75 p-4 backdrop-blur-sm"
+      role="presentation"
+    >
       <section
-        className="grid max-h-[calc(100vh-1.5rem)] w-full max-w-2xl gap-2 overflow-auto rounded border border-slate-200/70 bg-white p-3"
+        className="grid w-full max-w-lg gap-4 overflow-hidden rounded border border-slate-700 bg-slate-900 p-5 shadow-2xl ring-1 ring-blue-500/20"
         role="dialog"
         aria-modal="true"
         aria-labelledby="diag-title"
       >
-        <h1 id="diag-title" className="font-bold uppercase tracking-wider">
-          Something went wrong
-        </h1>
-        <p>
-          The app encountered an unexpected error. Please copy the diagnostic details and send them
-          to <strong>support@mysmarttrax.com</strong>.
-        </p>
-
-        <div className="rounded border-l-2 border-red-500 bg-red-50/80 p-2">
-          <p className="text-red-900!">
-            <strong>{payload.errorName}:</strong> {payload.errorMessage}
-          </p>
-          <p className="mt-0.5 text-red-700!">Captured at {payload.timestamp}</p>
+        <div className="flex items-start justify-between gap-3 border-b border-slate-800 pb-4">
+          <div className="min-w-0 space-y-2">
+            <Logo showText theme="dark" size="header" className="opacity-90" />
+            <h1 id="diag-title" className="text-lg font-semibold text-slate-100">
+              Something went wrong
+            </h1>
+            <p className="text-sm leading-relaxed text-slate-400">
+              Send diagnostic details to{' '}
+              <a
+                href="mailto:support@mysmarttrax.com"
+                className="font-medium text-blue-400 hover:text-blue-300"
+              >
+                support@mysmarttrax.com
+              </a>
+            </p>
+          </div>
         </div>
 
-        <pre className="max-h-60 overflow-auto rounded border border-slate-200/70 bg-slate-50 p-2 leading-relaxed">
-          {report}
-        </pre>
+        <div className="rounded border border-red-500/30 bg-red-950/40 px-3 py-2.5">
+          <p className="text-sm font-semibold text-red-300">{payload.errorName}</p>
+          <p className="mt-1 text-base leading-snug text-red-100">{payload.errorMessage}</p>
+          <p className="mt-2 text-xs text-red-300/80">
+            {formatTimestamp(payload.timestamp)}
+          </p>
+        </div>
+
+        <details className="group rounded border border-slate-800 bg-slate-950/60">
+          <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-400 hover:text-slate-300">
+            Technical details
+          </summary>
+          <pre className="max-h-36 overflow-auto border-t border-slate-800 px-3 py-2 font-mono text-[10px] leading-relaxed text-slate-500">
+            {compactTechnical}
+          </pre>
+        </details>
 
         {copyState === 'success' ? (
-          <p className="text-emerald-700!">Error details copied to clipboard.</p>
+          <p className="text-xs text-emerald-400">Full diagnostic report copied to clipboard.</p>
         ) : null}
         {copyState === 'error' ? (
-          <p className="text-red-700!">
-            Copy failed. Please select the details and copy manually.
+          <p className="text-xs text-red-400">
+            Copy failed. Expand technical details and copy manually.
           </p>
         ) : null}
 
-        <div className="flex flex-wrap justify-end gap-1">
-          <Button type="button" onClick={handleCopyDetails}>
-            Copy Error Details
+        <div className="flex flex-wrap justify-end gap-2 border-t border-slate-800 pt-4">
+          <Button type="button" variant="secondary" onClick={handleCopyDetails}>
+            Copy report
           </Button>
-          <Button type="button" variant="ghost" onClick={onReload}>
-            Reload App
+          <Button type="button" variant="secondary" onClick={onReload}>
+            Reload
           </Button>
-          <Button type="button" variant="ghost" onClick={onDismiss}>
+          <Button type="button" variant="secondary" onClick={onDismiss}>
             Dismiss
           </Button>
         </div>
