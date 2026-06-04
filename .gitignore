@@ -1,0 +1,23 @@
+# Environment and secrets
+client/.env
+server/.env
+*.local
+
+# Dependencies
+client/node_modules/
+server/node_modules/
+
+# Build output
+client/dist/
+server/dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# Local PDF test fixtures (keep directory via .gitkeep)
+server/debug/fixtures/*.pdf

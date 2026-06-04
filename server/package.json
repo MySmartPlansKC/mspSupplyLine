@@ -1,0 +1,41 @@
+{
+  "name": "server",
+  "version": "0.1.0",
+  "description": "MySmartPlans SupplyLine API",
+  "private": true,
+  "main": "src/server.ts",
+  "scripts": {
+    "start": "node dist/src/server.js",
+    "build": "tsc",
+    "dev": "tsx watch src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "migration:up": "tsx src/scripts/migrate.ts up",
+    "migration:status": "tsx src/scripts/migrate.ts status",
+    "migration:run": "tsx src/scripts/migrate.ts run",
+    "seed:dev": "tsx src/scripts/seed-dev-user.ts",
+    "test:auth": "tsx src/scripts/test-auth-smoke.ts"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.2",
+    "mysql2": "^3.14.0",
+    "pdf-parse": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/multer": "^1.4.12",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/node": "^22.13.10",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

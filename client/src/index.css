@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+html {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  color: var(--color-slate-900);
+}
+
+body {
+  min-height: 100vh;
+  width: 100%;
+  @apply antialiased bg-zinc-200;
+}
+
+input, select, textarea, button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* =========================================================================
+   INDUSTRIAL FORM CONTROL UTILITIES
+   ========================================================================= */
+
+.sl-input-label {
+  @apply block uppercase tracking-wide mb-1 select-none font-semibold text-slate-700;
+}
+
+.sl-input {
+  /* Adjusted to h-10 and py-1.5 to prevent 16px text clipping */
+  @apply h-10 w-full px-3 py-1.5 rounded border border-slate-300 bg-slate-50 transition-all duration-150 ease-in-out;
+}
+
+.sl-input:hover {
+  @apply border-blue-600;
+}
+
+.sl-input:focus,
+.sl-input:focus-visible {
+  @apply outline-none border-blue-600 bg-white ring ring-blue-600/30;
+}
+
+.sl-input:disabled {
+  @apply bg-slate-100 border-slate-200 cursor-not-allowed pointer-events-none shadow-none;
+}
+
+.sl-input.sl-input--error {
+  @apply border-red-400;
+}
+
+.sl-input.sl-input--error:hover {
+  @apply border-red-500 bg-slate-50;
+}
+
+.sl-input.sl-input--error:focus,
+.sl-input.sl-input--error:focus-visible {
+  @apply border-red-500 bg-white ring-red-500/30;
+}
+
+/* =========================================================================
+   APPLICATION SHELL LAYOUT
+   ========================================================================= */
+
+.sl-app-shell {
+  @apply mx-auto w-full max-w-[1800px] space-y-6 px-4 py-6 sm:px-6 lg:px-8 xl:px-10;
+}
+
+/* =========================================================================
+   HIGH-DENSITY FORM REGION SECTION HEADERS
+   ========================================================================= */
+
+.sl-form-section-banner {
+  /* Forced white text utility to fix dark-on-dark visibility */
+  @apply flex items-center h-8 px-2.5 mb-3 select-none rounded-sm bg-slate-800 uppercase tracking-wider font-bold text-white!;
+}
+
+.sl-form-section-grid {
+  @apply mb-4 grid grid-cols-1 gap-x-3 gap-y-2.5 sm:grid-cols-2;
+}
