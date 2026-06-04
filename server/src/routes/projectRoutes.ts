@@ -6,11 +6,13 @@ import {
   postProject,
 } from '../controllers/projectController';
 import { getProjectInventory } from '../controllers/inventoryController';
+import { deletePurgeTestDataHandler } from '../controllers/adminController';
 import {
   getProjectStaging,
   postProjectStaging,
 } from '../controllers/stagingController';
 import { authenticateJwt } from '../middleware/authenticateJwt';
+import { requireMspAdmin } from '../middleware/requireMspAdmin';
 import { optionalStagingPdfUpload } from '../middleware/uploadStagingPdf';
 import { verifyProjectAccess } from '../middleware/verifyProjectAccess';
 
@@ -21,6 +23,14 @@ projectRoutes.get('/', authenticateJwt, getProjectsForUser);
 projectRoutes.get('/saturn-available', authenticateJwt, getSaturnAvailableProjectsHandler);
 
 projectRoutes.post('/', authenticateJwt, postProject);
+
+projectRoutes.delete(
+  '/admin/purge-test-data',
+  authenticateJwt,
+  verifyProjectAccess,
+  requireMspAdmin,
+  deletePurgeTestDataHandler
+);
 
 projectRoutes.get(
   '/:projectId/inventory',

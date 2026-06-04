@@ -15,6 +15,8 @@ import Badge, {
 } from '../components/Common/Badge';
 import Card from '../components/Common/Card';
 import { Spinner } from '../components/Common/Spinner';
+import ConfirmModal from '../components/Feedback/ConfirmModal';
+import { useAuth } from '../context/AuthContext';
 
 const LEDGER_GRID_COLS =
   'grid grid-cols-[100px_140px_1fr_80px_140px_minmax(22rem,1fr)] gap-4 w-full';
@@ -73,6 +75,7 @@ interface AssemblyLineIngestResponse {
 
 export default function StagingQueueView() {
   const { projectId = '' } = useParams();
+  const { user } = useAuth();
 
   const [documents, setDocuments] = useState<SubmittalDocument[]>([]);
   const [staging, setStaging] = useState<StagingItem[]>([]);
@@ -85,6 +88,9 @@ export default function StagingQueueView() {
   const [dragOver, setDragOver] = useState(false);
 
   const [isSyncing, setIsSyncing] = useState(false);
+  const [purgeBusy, setPurgeBusy] = useState(false);
+  const [purgeError, setPurgeError] = useState<string | null>(null);
+  const [purgeConfirmOpen, setPurgeConfirmOpen] = useState(false);
 
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<number | null>(null);
@@ -260,6 +266,38 @@ export default function StagingQueueView() {
     }, 1500);
   }, [isSyncing]);
 
+  const executePurgeTestData = useCallback(async () => {
+    setPurgeBusy(true);
+    setPurgeError(null);
+
+    const url = `/api/projects/admin/purge-test-data?projectId=${encodeURIComponent(projectId)}`;
+
+    try {
+      const token = localStorage.getItem('sl_token');
+      const response = await fetch(url, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `Purge failed (${response.status})`);
+      }
+
+      window.location.reload();
+    } catch (error) {
+      setPurgeConfirmOpen(false);
+      setPurgeError(error instanceof Error ? error.message : 'Purge failed.');
+    } finally {
+      setPurgeBusy(false);
+    }
+  }, [projectId]);
+
+  const handlePurgeConfirm = useCallback(() => {
+    void executePurgeTestData();
+  }, [executePurgeTestData]);
+
   const documentRows = useMemo(
     () =>
       documents.map((doc) => (
@@ -426,133 +464,180 @@ export default function StagingQueueView() {
 
         <ProjectBackLink />
 
-        <Card
-          heading="Submittal Intake"
-          subheading="Approved PDF submittals and registry-backed sync (registry sync simulated until backend ships)"
-          className="overflow-hidden"
-          noBodyPadding
-        >
-          {ingestSuccess !== null ? (
-            <div className="border-b border-slate-200/70 px-3 pt-3">
-              <p className="rounded border-l-2 border-emerald-600 bg-emerald-50/60 px-2 py-1.5">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start w-full px-1">
+          <div className="flex min-w-0 flex-col gap-6">
+            {loading ? (
+              <div className="flex items-center gap-1.5">
+                <Spinner size="sm" />
+                Loading assembly line...
+              </div>
+            ) : null}
+
+            {ledgerError ? (
+              <div className="rounded border-l-2 border-red-500 bg-red-50/80 p-2">
+                Operational Exception Intercepted: {ledgerError}
+              </div>
+            ) : null}
+
+            {!loading && !ledgerError ? (
+              <>
+                <Card
+                  heading="Submittal Document Registry"
+                  subheading={
+                    documents.length === 0
+                      ? 'No PDFs ingested for this project yet.'
+                      : `${documents.length} PDF${documents.length === 1 ? '' : 's'}`
+                  }
+                  className="overflow-hidden"
+                  noBodyPadding
+                >
+                  {documents.length === 0 ? (
+                    <p className="px-3 py-4 text-center text-slate-500">
+                      Upload or sync a submittal to see it here.
+                    </p>
+                  ) : (
+                    <ul className="border-t border-slate-200/70">{documentRows}</ul>
+                  )}
+                </Card>
+
+                <Card
+                  heading="Pending Intake Ledger"
+                  subheading={`${pendingCount} pending · ${staging.length} total rows in loading dock`}
+                  className="overflow-hidden"
+                  noBodyPadding
+                >
+                  {staging.length === 0 ? (
+                    <p className="px-3 py-4 text-center italic">
+                      Staging queue is currently empty for this operational node.
+                    </p>
+                  ) : (
+                    <div className="border-t border-slate-200/70">{ledgerGroups}</div>
+                  )}
+                </Card>
+              </>
+            ) : null}
+          </div>
+
+          <div className="bg-slate-950 text-slate-100 rounded border border-slate-800 p-4 space-y-6 shadow-xl">
+            {ingestSuccess !== null ? (
+              <p className="rounded border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
                 Imported {ingestSuccess} item(s) into the staging queue.
               </p>
-            </div>
-          ) : null}
+            ) : null}
 
-          <div className="p-3">
-            <div className="sl-form-section-banner">Manual Submittal</div>
-
-            <div
-              className={`transition-colors ${dragOver ? 'bg-slate-50' : ''} ${
-                ingestBusy ? 'pointer-events-none opacity-70' : ''
-              }`}
-              onDragOver={(event) => {
-                event.preventDefault();
-                if (!ingestBusy) setDragOver(true);
-              }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={onPdfDrop}
-            >
-              <div className="flex flex-col items-center justify-center gap-2 rounded border border-dashed border-slate-300 p-3">
-                {ingestBusy ? (
-                  <div className="flex items-center gap-1.5">
-                    <Spinner size="sm" />
-                    Processing submittal PDF...
-                  </div>
-                ) : (
-                  <>
-                    <p className="font-semibold">Drop Approved Submittal PDF Here</p>
-                    <p>Supported: .pdf</p>
-                    <Button
-                      type="button"
-                      variant="success"
-                      onClick={() => pdfInputRef.current?.click()}
-                    >
-                      <span className="font-semibold">Select Submittal PDF</span>
-                    </Button>
-                  </>
-                )}
-                <input
-                  ref={pdfInputRef}
-                  type="file"
-                  className="hidden"
-                  onChange={onPdfSelected}
-                />
+            <div>
+              <div className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                Manual Submittal
               </div>
+              <div
+                className={`transition-colors rounded border border-dashed border-slate-700 bg-slate-900/50 p-4 ${
+                  dragOver ? 'bg-slate-800/50' : ''
+                } ${ingestBusy ? 'pointer-events-none opacity-70' : ''}`}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  if (!ingestBusy) setDragOver(true);
+                }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={onPdfDrop}
+              >
+                <div className="flex flex-col items-center justify-center gap-2 text-center">
+                  {ingestBusy ? (
+                    <div className="flex items-center gap-1.5 text-slate-300">
+                      <Spinner size="sm" />
+                      Processing submittal PDF...
+                    </div>
+                  ) : (
+                    <>
+                      <p className="font-semibold text-slate-100">
+                        Drop Approved Submittal PDF Here
+                      </p>
+                      <p className="text-sm text-slate-400">Supported: .pdf</p>
+                      <Button
+                        type="button"
+                        variant="success"
+                        onClick={() => pdfInputRef.current?.click()}
+                      >
+                        Select Submittal PDF
+                      </Button>
+                    </>
+                  )}
+                  <input
+                    ref={pdfInputRef}
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    className="hidden"
+                    onChange={onPdfSelected}
+                  />
+                </div>
 
-              {ingestError ? (
-                <p className="mt-2 rounded border-l-2 border-red-500 bg-red-50/80 px-2 py-1.5">
-                  {ingestError}
-                </p>
-              ) : null}
+                {ingestError ? (
+                  <p className="mt-3 rounded border border-red-500/40 bg-red-950/40 px-2.5 py-1.5 text-sm text-red-300">
+                    {ingestError}
+                  </p>
+                ) : null}
+              </div>
             </div>
 
-            <div className="sl-form-section-banner mt-3">Original Project Registry</div>
-
-            <div className="p-3">
+            <div className="border-t border-slate-800 pt-4">
+              <div className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                Original Project Registry
+              </div>
               <Button
+                type="button"
                 variant="secondary"
+                className="w-full justify-center"
                 loading={isSyncing}
                 disabled={isSyncing}
                 onClick={handleSyncFromRegistry}
               >
-                <span className="font-semibold">Sync from Original Project Registry</span>
+                Sync from Original Project Registry
               </Button>
             </div>
-          </div>
-        </Card>
 
-        {loading ? (
-          <div className="flex items-center gap-1.5">
-            <Spinner size="sm" />
-            Loading assembly line...
-          </div>
-        ) : null}
-
-        {ledgerError ? (
-          <div className="rounded border-l-2 border-red-500 bg-red-50/80 p-2">
-            Operational Exception Intercepted: {ledgerError}
-          </div>
-        ) : null}
-
-        {!loading && !ledgerError ? (
-          <>
-            <Card
-              heading="Submittals"
-              subheading={
-                documents.length === 0
-                  ? 'No PDFs ingested for this project yet.'
-                  : `${documents.length} PDF${documents.length === 1 ? '' : 's'}`
-              }
-              className="overflow-hidden"
-              noBodyPadding
-            >
-              {documents.length === 0 ? (
-                <p className="px-3 py-4 text-center text-slate-500">
-                  Upload or sync a submittal to see it here.
+            {user?.role === 'MspAdmin' ? (
+              <div className="border-t border-red-900/60 -mx-4 rounded-b bg-red-950/10 px-4 pt-4 pb-2">
+                <div className="mb-1 text-xs font-bold uppercase tracking-wider text-red-400">
+                  Testing Workspace Sandbox (mspadmin)
+                </div>
+                <p className="mb-3 text-xs leading-relaxed text-slate-400">
+                  Permanently removes all submittal documents and staging rows for PID-
+                  {projectId}. This cannot be undone.
                 </p>
-              ) : (
-                <ul className="border-t border-slate-200/70">{documentRows}</ul>
-              )}
-            </Card>
+                <Button
+                  type="button"
+                  variant="danger"
+                  className="w-full justify-center font-semibold"
+                  onClick={() => setPurgeConfirmOpen(true)}
+                  loading={purgeBusy}
+                  disabled={purgeBusy}
+                >
+                  Clean Data & Reset Node
+                </Button>
+                {purgeError ? (
+                  <p className="mt-2 text-xs text-red-400">{purgeError}</p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        </div>
 
-            <Card
-              heading="Pending Intake Ledger"
-              subheading={`${pendingCount} pending · ${staging.length} total rows in loading dock`}
-              className="overflow-hidden"
-              noBodyPadding
-            >
-              {staging.length === 0 ? (
-                <p className="px-3 py-4 text-center italic">
-                  Staging queue is currently empty for this operational node.
-                </p>
-              ) : (
-                <div className="border-t border-slate-200/70">{ledgerGroups}</div>
-              )}
-            </Card>
-          </>
-        ) : null}
+        <ConfirmModal
+          open={purgeConfirmOpen}
+          title="Clean data and reset node?"
+          message={
+            <>
+              Permanently delete all staging and submittal data for project{' '}
+              <span className="font-semibold text-slate-900">{projectId}</span>? This cannot be
+              undone.
+            </>
+          }
+          confirmLabel="Clean Data & Reset Node"
+          cancelLabel="Cancel"
+          confirmVariant="danger"
+          loading={purgeBusy}
+          onConfirm={handlePurgeConfirm}
+          onCancel={() => setPurgeConfirmOpen(false)}
+        />
 
         {payloadModalItem ? (() => {
           let rawDataObj: any = null;

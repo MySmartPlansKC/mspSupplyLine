@@ -361,8 +361,8 @@ export default function DashboardView() {
           actions={headerActions}
         />
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
-          <section className="space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start w-full px-1">
+          <section className="flex min-w-0 flex-col gap-6">
             {canImpersonateClientView && viewMode === 'client' ? (
               <p className="rounded border-l-2 border-amber-500 bg-amber-50/60 px-2 py-1.5">
                 User preview is active. Staging queue actions are hidden to match client access.
@@ -655,59 +655,59 @@ export default function DashboardView() {
             ) : null}
           </section>
 
-          <aside className="space-y-4 rounded border border-slate-800 bg-slate-900 p-3">
+          <aside className="bg-slate-950 text-slate-100 rounded border border-slate-800 p-4 space-y-6 shadow-xl">
             <div>
-              <h2 className="font-bold uppercase tracking-wider text-slate-400">
+              <div className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-2">
                 System Status Node
-              </h2>
-              <dl className="mt-2 space-y-1.5">
+              </div>
+              <dl className="space-y-1.5">
                 <div>
-                  <dt className="uppercase tracking-wider text-slate-300">Operator</dt>
-                  <dd className="text-slate-200">{user?.email ?? '—'}</dd>
+                  <dt className="text-xs uppercase tracking-wider text-slate-500">Operator</dt>
+                  <dd className="text-sm text-slate-200">{user?.email ?? '—'}</dd>
                 </div>
                 <div>
-                  <dt className="uppercase tracking-wider text-slate-300">Role</dt>
-                  <dd className="text-slate-200">{effectiveRole ?? '—'}</dd>
+                  <dt className="text-xs uppercase tracking-wider text-slate-500">Role</dt>
+                  <dd className="text-sm text-slate-200">{effectiveRole ?? '—'}</dd>
                 </div>
                 {canImpersonateClientView ? (
                   <div>
-                    <dt className="uppercase tracking-wider text-slate-300">
+                    <dt className="text-xs uppercase tracking-wider text-slate-500">
                       View mode
                     </dt>
-                    <dd className="capitalize text-slate-200">{viewMode}</dd>
+                    <dd className="text-sm capitalize text-slate-200">{viewMode}</dd>
                   </div>
                 ) : null}
               </dl>
             </div>
 
-            <div className="border-t border-slate-800 pt-3">
-              <h2 className="font-bold uppercase tracking-wider text-slate-400">
+            <div className="border-t border-slate-800 pt-4">
+              <div className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-2">
                 Project Metrics
-              </h2>
-              <dl className="mt-2 space-y-1.5">
-                <div className="flex justify-between">
-                  <dt className="text-slate-300">Total scoped</dt>
-                  <dd className="text-white">{projects.length}</dd>
+              </div>
+              <dl className="space-y-1.5">
+                <div className="flex justify-between text-sm">
+                  <dt className="text-slate-400">Total scoped</dt>
+                  <dd className="font-semibold text-slate-100">{projects.length}</dd>
                 </div>
-                <div className="flex justify-between">
-                  <dt className="text-slate-300">Active</dt>
-                  <dd className="text-white">{activeCount}</dd>
+                <div className="flex justify-between text-sm">
+                  <dt className="text-slate-400">Active</dt>
+                  <dd className="font-semibold text-slate-100">{activeCount}</dd>
                 </div>
               </dl>
             </div>
 
             {showStagingQueue ? (
-              <div className="border-t border-slate-800 pt-3">
-                <h2 className="font-bold uppercase tracking-wider text-emerald-400">
+              <div className="border-t border-slate-800 pt-4">
+                <div className="text-sm font-semibold uppercase tracking-wider text-emerald-400 mb-2">
                   Staging Dock
-                </h2>
-                <p className="mt-1 text-slate-300">
+                </div>
+                <p className="mb-3 text-xs leading-relaxed text-slate-400">
                   Global intake queues per deployment node.
                 </p>
                 {projects.length === 0 ? (
-                  <p className="mt-2 text-slate-300">No projects in scope.</p>
+                  <p className="text-sm text-slate-400">No projects in scope.</p>
                 ) : (
-                  <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto">
+                  <ul className="max-h-48 space-y-2 overflow-y-auto">
                     {projects.map((project) => (
                       <li key={project.projectId}>
                         <button
@@ -716,12 +716,12 @@ export default function DashboardView() {
                           onClick={() =>
                             navigate(`/projects/${project.projectId}/staging`)
                           }
-                          className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1.5 text-left transition-colors duration-150 hover:border-slate-600 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="w-full rounded border border-slate-700 bg-slate-900/50 px-3 py-2 text-left transition-colors duration-150 hover:border-slate-600 hover:bg-slate-800/50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          <span className="block truncate font-semibold text-slate-200">
+                          <span className="block truncate font-semibold text-slate-100">
                             {project.projectName}
                           </span>
-                          <span className="text-slate-400">
+                          <span className="text-xs text-slate-400">
                             PID-{project.projectId}
                           </span>
                         </button>
