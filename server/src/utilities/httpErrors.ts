@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import { isRetryableConnectionError } from './dbConnectionErrors';
 
 export class AppError extends Error {
   constructor(
@@ -53,6 +54,13 @@ export function isDuplicateEntryError(error: unknown): boolean {
   return candidate.code === 'ER_DUP_ENTRY' || candidate.errno === 1062;
 }
 
+export class NotFoundError extends AppError {
+  constructor(message = 'Not found') {
+    super(message, 404);
+    this.name = 'NotFoundError';
+  }
+}
+
 export class ServiceUnavailableError extends AppError {
   constructor(message = 'Service unavailable') {
     super(message, 503);
@@ -67,5 +75,13 @@ export function sendError(res: Response, error: unknown): void {
   }
 
   console.error(error);
+
+  if (isRetryableConnectionError(error)) {
+    res.status(503).json({
+      error: 'Database is temporarily unavailable. Wait a moment and try again.',
+    });
+    return;
+  }
+
   res.status(500).json({ error: 'Internal server error' });
 }

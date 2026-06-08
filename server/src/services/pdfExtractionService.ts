@@ -2,28 +2,48 @@ import pdfParse from 'pdf-parse';
 import type { StagingIngestInput } from '../repositories/StagingRepository';
 import { BadRequestError } from '../utilities/httpErrors';
 
-export const EXTRACTOR_VERSION = '2.0.0';
+export const EXTRACTOR_VERSION = '3.0.0';
+export const PARSER_ENGINE = 'multi-window-hybrid';
 
-const AI_TUNNEL_TIMEOUT_MS = 120_000;
+/** Large CAD submittals can exceed 2 min — align with MySmartPlansAI AI_WORKER_FETCH_TIMEOUT_MS (default 15 min). */
+function aiTunnelTimeoutMs(): number {
+  const raw = process.env.SUPPLYLINE_AI_TUNNEL_TIMEOUT_MS?.trim();
+  const n = raw ? Number(raw) : Number.NaN;
+  if (Number.isFinite(n) && n > 0) return Math.floor(n);
+  return 900_000;
+}
 
-const COVER_LABELS = {
+const PACKET_LABELS = {
   submittal: /submittal\s*(?:no|number|#)?\s*[:\-]?\s*(.+)/i,
   submittalAlt: /sub\s*(?:no|#)?\s*[:\-]?\s*(.+)/i,
   division: /(?:spec\s*)?division\s*(?:title)?\s*[:\-]?\s*(.+)/i,
   section: /section\s*(?:name|title)?\s*[:\-]?\s*(.+)/i,
-  fabricator: /(?:fabricator|vendor|manufacturer|supplier|contractor)\s*[:\-]?\s*(.+)/i,
 } as const;
 
-/** Fallback: "Received From ... (Company Name)" title-block layouts. */
-const RECEIVED_FROM_PARENS_REGEX = /received\s*from[^(\n]*\(([^)]+)\)/i;
-
-/** Fallback: trailing vendor block on submittal package header lines. */
-const SUBMITTAL_PACKAGE_VENDOR_REGEX = /submittal package.*-\s*([^-\n]+)$/i;
+function trimOptional(value: string | null | undefined, maxLength: number): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  return trimmed.slice(0, maxLength);
+}
 
 export interface SubmittalCoverContext {
   externalRecordRef: string | null;
   categoryName: string | null;
   manufacturer: string | null;
+  manufacturerAddress: string | null;
+  manufacturerPhone: string | null;
+  manufacturerWebsite: string | null;
+  manufacturerContact: string | null;
+}
+
+export interface SubmittalPacketDetails {
+  externalRecordRef: string | null;
+  categoryName: string | null;
 }
 
 export interface PdfParsedLine {
@@ -40,11 +60,39 @@ interface AiSubmittalItem {
   description?: string | null;
   rawRow?: string;
   pageIndex?: number;
+  manufacturerName?: string;
+  manufacturer?: string;
+  extractedManufacturer?: string;
+  fabricator?: string;
+  extractedMfgAddress?: string;
+  extracted_mfg_address?: string;
+  manufacturerAddress?: string;
+  address?: string;
+  extractedMfgPhone?: string;
+  extracted_mfg_phone?: string;
+  manufacturerPhone?: string;
+  phone?: string;
+  extractedMfgWebsite?: string;
+  extracted_mfg_website?: string;
+  manufacturerWebsite?: string;
+  website?: string;
+  extractedMfgContact?: string;
+  extracted_mfg_contact?: string;
+  manufacturerContact?: string;
+  contact?: string;
 }
 
-interface AiSubmittalResponse {
-  items?: AiSubmittalItem[];
+interface AiSubmittalCover {
+  manufacturerName?: string;
+  manufacturerAddress?: string;
+  manufacturerPhone?: string;
+  manufacturerWebsite?: string;
+  manufacturerContact?: string;
+  externalRecordRef?: string;
+  categoryName?: string;
 }
+
+type AiSubmittalResponse = AiSubmittalItem[] | { items?: AiSubmittalItem[] };
 
 function normalizeLines(text: string): string[] {
   return text
@@ -85,59 +133,132 @@ function trimManufacturerValue(value: string): string | null {
   return trimmed.length > 0 ? trimmed.slice(0, 255) : null;
 }
 
-function extractManufacturerFallbacks(lines: string[]): string | null {
-  for (const line of lines) {
-    if (/received\s*from/i.test(line)) {
-      const receivedFromMatch = line.match(RECEIVED_FROM_PARENS_REGEX);
-      if (receivedFromMatch?.[1]) {
-        const manufacturer = trimManufacturerValue(receivedFromMatch[1]);
-        if (manufacturer) return manufacturer;
-      }
+function readStringField(record: Record<string, unknown>, ...keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
     }
   }
-
-  for (const line of lines) {
-    const packageMatch = line.match(SUBMITTAL_PACKAGE_VENDOR_REGEX);
-    if (packageMatch?.[1]) {
-      const manufacturer = trimManufacturerValue(packageMatch[1]);
-      if (manufacturer) return manufacturer;
-    }
-  }
-
-  return null;
+  return undefined;
 }
 
-function extractCoverFromLines(lines: string[]): SubmittalCoverContext {
-  const context: SubmittalCoverContext = {
+export function liftManufacturerCoverFromAiItems(
+  items: unknown[]
+): AiSubmittalCover | undefined {
+  if (items.length === 0) {
+    return undefined;
+  }
+
+  const first = items[0];
+  if (!first || typeof first !== 'object' || Array.isArray(first)) {
+    return undefined;
+  }
+
+  const record = first as Record<string, unknown>;
+  const cover: AiSubmittalCover = {
+    manufacturerName: readStringField(
+      record,
+      'manufacturerName',
+      'manufacturer',
+      'extractedManufacturer',
+      'fabricator'
+    ),
+    manufacturerAddress: readStringField(
+      record,
+      'extractedMfgAddress',
+      'extracted_mfg_address',
+      'manufacturerAddress',
+      'address'
+    ),
+    manufacturerPhone: readStringField(
+      record,
+      'extractedMfgPhone',
+      'extracted_mfg_phone',
+      'manufacturerPhone',
+      'phone',
+      'supportPhone'
+    ),
+    manufacturerWebsite: readStringField(
+      record,
+      'extractedMfgWebsite',
+      'extracted_mfg_website',
+      'manufacturerWebsite',
+      'website',
+      'websiteUrl'
+    ),
+    manufacturerContact: readStringField(
+      record,
+      'extractedMfgContact',
+      'extracted_mfg_contact',
+      'manufacturerContact',
+      'contact',
+      'primaryContact',
+      'projectManagerName'
+    ),
+  };
+
+  const hasAnyField = Object.values(cover).some((value) => typeof value === 'string' && value.length > 0);
+  return hasAnyField ? cover : undefined;
+}
+
+function extractPacketDetailsFromLines(lines: string[]): SubmittalPacketDetails {
+  const details: SubmittalPacketDetails = {
     externalRecordRef: null,
     categoryName: null,
-    manufacturer: null,
   };
 
   for (const line of lines) {
-    if (!context.externalRecordRef) {
-      context.externalRecordRef =
-        captureLabelValue(line, COVER_LABELS.submittal) ??
-        captureLabelValue(line, COVER_LABELS.submittalAlt);
+    if (!details.externalRecordRef) {
+      details.externalRecordRef =
+        captureLabelValue(line, PACKET_LABELS.submittal) ??
+        captureLabelValue(line, PACKET_LABELS.submittalAlt);
     }
-    if (!context.categoryName) {
-      context.categoryName =
-        captureLabelValue(line, COVER_LABELS.division) ??
-        captureLabelValue(line, COVER_LABELS.section);
-    }
-    if (!context.manufacturer) {
-      context.manufacturer = captureLabelValue(line, COVER_LABELS.fabricator);
+    if (!details.categoryName) {
+      details.categoryName =
+        captureLabelValue(line, PACKET_LABELS.division) ??
+        captureLabelValue(line, PACKET_LABELS.section);
     }
   }
 
-  if (!context.manufacturer) {
-    context.manufacturer = extractManufacturerFallbacks(lines);
-  }
-
-  return context;
+  return details;
 }
 
-function parsePass1Cover(pages: string[]): SubmittalCoverContext {
+function normalizeAiCover(raw: AiSubmittalCover | undefined): AiSubmittalCover | undefined {
+  if (!raw) {
+    return undefined;
+  }
+
+  return {
+    manufacturerName: raw.manufacturerName,
+    manufacturerAddress: raw.manufacturerAddress,
+    manufacturerPhone: raw.manufacturerPhone,
+    manufacturerWebsite: raw.manufacturerWebsite,
+    manufacturerContact: raw.manufacturerContact,
+    externalRecordRef: raw.externalRecordRef,
+    categoryName: raw.categoryName,
+  };
+}
+
+function mergePacketAndAiCover(
+  packet: SubmittalPacketDetails,
+  aiCover: AiSubmittalCover | undefined
+): SubmittalCoverContext {
+  const normalized = normalizeAiCover(aiCover);
+
+  return {
+    externalRecordRef:
+      packet.externalRecordRef ?? trimOptional(normalized?.externalRecordRef, 255),
+    categoryName: packet.categoryName ?? trimOptional(normalized?.categoryName, 255),
+    manufacturer: trimManufacturerValue(normalized?.manufacturerName ?? '') ?? null,
+    manufacturerAddress: trimOptional(normalized?.manufacturerAddress, 500),
+    manufacturerPhone: trimOptional(normalized?.manufacturerPhone, 50),
+    manufacturerWebsite: trimOptional(normalized?.manufacturerWebsite, 255),
+    manufacturerContact: trimOptional(normalized?.manufacturerContact, 255),
+  };
+}
+
+function parsePass1PacketDetails(pages: string[]): SubmittalPacketDetails {
   const coverWindow = pages.slice(0, 2).join('\n');
   let lines = normalizeLines(coverWindow);
 
@@ -145,7 +266,7 @@ function parsePass1Cover(pages: string[]): SubmittalCoverContext {
     lines = normalizeLines(pages[0].slice(0, 4000));
   }
 
-  return extractCoverFromLines(lines);
+  return extractPacketDetailsFromLines(lines);
 }
 
 function readAiTunnelConfig(): { baseUrl: string; apiKey: string } {
@@ -169,11 +290,14 @@ function normalizeAiQuantity(value: unknown): number {
   return parsed;
 }
 
-function mapAiResponseToSubmittalLines(
-  payload: AiSubmittalResponse | AiSubmittalItem[]
-): PdfParsedLine[] {
-  const items = Array.isArray(payload) ? payload : (payload.items ?? []);
+function unwrapAiSubmittalItems(payload: AiSubmittalResponse): AiSubmittalItem[] {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  return payload.items ?? [];
+}
 
+function mapAiResponseToSubmittalLines(items: AiSubmittalItem[]): PdfParsedLine[] {
   return items
     .map((item) => {
       const partToken = item.partToken?.trim();
@@ -224,16 +348,22 @@ function logAiTunnelFailure(error: unknown, context?: Record<string, unknown>): 
 async function postSubmittalToAiTunnel(
   baseUrl: string,
   apiKey: string,
-  rawText: string
+  pdfBuffer: Buffer
 ): Promise<AiSubmittalResponse> {
+  const formData = new FormData();
+  formData.append(
+    'file',
+    new Blob([new Uint8Array(pdfBuffer)], { type: 'application/pdf' }),
+    'submittal.pdf'
+  );
+
   const response = await fetch(`${baseUrl}/supplyline/submittal`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
       'x-api-key': apiKey,
     },
-    body: JSON.stringify({ rawText }),
-    signal: AbortSignal.timeout(AI_TUNNEL_TIMEOUT_MS),
+    body: formData,
+    signal: AbortSignal.timeout(aiTunnelTimeoutMs()),
   });
 
   const responseBody = (await response.json().catch(() => null)) as AiSubmittalResponse | null;
@@ -257,17 +387,19 @@ async function postSubmittalToAiTunnel(
 }
 
 async function parsePass2SubmittalLines(
-  pages: string[],
-  cover: SubmittalCoverContext
-): Promise<PdfParsedLine[]> {
-  void cover;
-
+  pdfBuffer: Buffer
+): Promise<{ lines: PdfParsedLine[]; aiCover?: AiSubmittalCover }> {
   const { baseUrl, apiKey } = readAiTunnelConfig();
-  const rawText = pages.join('\n');
 
   try {
-    const payload = await postSubmittalToAiTunnel(baseUrl, apiKey, rawText);
-    return mapAiResponseToSubmittalLines(payload);
+    const payload = await postSubmittalToAiTunnel(baseUrl, apiKey, pdfBuffer);
+    const rawItems = unwrapAiSubmittalItems(payload);
+    const aiCover = liftManufacturerCoverFromAiItems(rawItems);
+
+    return {
+      lines: mapAiResponseToSubmittalLines(rawItems),
+      aiCover,
+    };
   } catch (error) {
     if (!(error instanceof BadRequestError)) {
       logAiTunnelFailure(error);
@@ -299,14 +431,18 @@ function mapSubmittalLinesToStagingItems(
     const manufacturer = cover.manufacturer?.trim();
     if (!manufacturer) {
       throw new BadRequestError(
-        'PDF cover block must include a fabricator/vendor before submittal rows can be ingested'
+        'AI worker must return manufacturerName on the first submittal item before rows can be ingested'
       );
     }
 
     return {
       externalRecordRef: cover.externalRecordRef,
       categoryName: cover.categoryName,
-      manufacturer,
+      extractedManufacturer: manufacturer,
+      extractedMfgAddress: trimOptional(cover.manufacturerAddress, 500),
+      extractedMfgPhone: trimOptional(cover.manufacturerPhone, 50),
+      extractedMfgWebsite: trimOptional(cover.manufacturerWebsite, 255),
+      extractedMfgContact: trimOptional(cover.manufacturerContact, 255),
       modelNumber: line.modelNumber,
       description: line.description,
       quantity: line.quantity,
@@ -315,6 +451,7 @@ function mapSubmittalLinesToStagingItems(
         rawRow: line.rawRow,
         pageIndex: line.pageIndex,
         extractorVersion: EXTRACTOR_VERSION,
+        parserEngine: PARSER_ENGINE,
       },
     };
   });
@@ -338,8 +475,9 @@ export async function processSubmittalPDF(fileBuffer: Buffer): Promise<StagingIn
   }
 
   const pages = splitPages(text, parsed.numpages ?? 1);
-  const cover = parsePass1Cover(pages);
-  const submittalLines = await parsePass2SubmittalLines(pages, cover);
+  const packet = parsePass1PacketDetails(pages);
+  const { lines: submittalLines, aiCover } = await parsePass2SubmittalLines(fileBuffer);
+  const mergedCover = mergePacketAndAiCover(packet, aiCover);
 
   if (submittalLines.length === 0) {
     throw new BadRequestError(
@@ -347,5 +485,5 @@ export async function processSubmittalPDF(fileBuffer: Buffer): Promise<StagingIn
     );
   }
 
-  return mapSubmittalLinesToStagingItems(submittalLines, cover);
+  return mapSubmittalLinesToStagingItems(submittalLines, mergedCover);
 }

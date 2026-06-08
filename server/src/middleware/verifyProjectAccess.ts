@@ -44,8 +44,8 @@ export async function verifyProjectAccess(
       throw new BadRequestError('Project context required');
     }
 
-    const project = await ProjectRepository.findById(projectId);
-    if (!project) {
+    const exists = await ProjectRepository.existsById(projectId);
+    if (!exists) {
       throw new ForbiddenError('You do not have access to this project');
     }
 

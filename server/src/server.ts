@@ -1,12 +1,14 @@
 import cors from 'cors';
 import express, { NextFunction, Request, Response } from 'express';
 import 'dotenv/config';
-import { initSupplylinePool } from '../config/database';
+import { initSupplylinePool, warmSupplylinePool } from '../config/database';
 import authRoutes from './routes/authRoutes';
+import manufacturerRoutes from './routes/manufacturerRoutes';
 import projectRoutes from './routes/projectRoutes';
 import { AppError, sendError } from './utilities/httpErrors';
 
 initSupplylinePool();
+void warmSupplylinePool();
 
 const app = express();
 const port = Number(process.env.PORT ?? 3001);
@@ -37,6 +39,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/manufacturers', manufacturerRoutes);
 app.use('/api/projects', projectRoutes);
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

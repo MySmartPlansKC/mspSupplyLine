@@ -4,6 +4,7 @@ import mysql, {
   ResultSetHeader,
   RowDataPacket,
 } from 'mysql2/promise';
+import { isRetryableConnectionError } from '../src/utilities/dbConnectionErrors';
 
 type QueryParam = string | number | boolean | Date | null | Buffer;
 
@@ -24,8 +25,17 @@ function trimEnv(value: string | undefined): string {
   return value?.trim() ?? '';
 }
 
+function readSupplylineDbConfig() {
+  return {
+    host: trimEnv(process.env.MARIA_DB_HOST) || 'localhost',
+    port: Number(process.env.MARIA_DB_PORT ?? 3306),
+    user: trimEnv(process.env.MARIA_DB_USER),
+    password: String(process.env.MARIA_DB_PASSWORD ?? ''),
+    database: trimEnv(process.env.MARIA_DB_NAME),
+  };
+}
+
 function readSaturnDbConfig(): SaturnDbConfig | null {
-  // Same VM as SupplyLine: omit SATURN_DB_HOST to use MARIA_DB_HOST (localhost / 127.0.0.1).
   const host =
     trimEnv(process.env.SATURN_DB_HOST) ||
     trimEnv(process.env.MARIA_DB_HOST) ||
@@ -58,28 +68,30 @@ export function isSaturnPoolConfigured(): boolean {
   return readSaturnDbConfig() !== null;
 }
 
-function attachUtcTimezone(pool: Pool): void {
-  pool.on('connection', (connection: PoolConnection) => {
-    void connection.query("SET time_zone = '+00:00'");
+function createSupplylinePool(): Pool {
+  const config = readSupplylineDbConfig();
+
+  return mysql.createPool({
+    host: config.host,
+    port: config.port,
+    user: config.user,
+    password: config.password,
+    database: config.database,
+    waitForConnections: true,
+    connectionLimit: Number(process.env.DB_POOL_LIMIT ?? 10),
+    connectTimeout: Number(process.env.DB_CONNECT_TIMEOUT_MS ?? 5_000),
+    idleTimeout: Number(process.env.DB_IDLE_TIMEOUT_MS ?? 60_000),
+    maxIdle: Number(process.env.DB_POOL_MAX_IDLE ?? 5),
+    enableKeepAlive: true,
+    keepAliveInitialDelay: Number(process.env.DB_KEEPALIVE_DELAY_MS ?? 10_000),
+    timezone: '+00:00',
+    charset: 'utf8mb4',
   });
 }
 
 export function initSupplylinePool(): Pool {
   if (!supplylinePool) {
-    supplylinePool = mysql.createPool({
-      host: process.env.MARIA_DB_HOST ?? 'localhost',
-      port: Number(process.env.MARIA_DB_PORT ?? 3306),
-      user: process.env.MARIA_DB_USER,
-      password: process.env.MARIA_DB_PASSWORD,
-      database: process.env.MARIA_DB_NAME,
-      waitForConnections: true,
-      connectionLimit: Number(process.env.DB_POOL_LIMIT ?? 10),
-      enableKeepAlive: true,
-      keepAliveInitialDelay: 0,
-      charset: 'utf8mb4',
-    });
-
-    attachUtcTimezone(supplylinePool);
+    supplylinePool = createSupplylinePool();
   }
   return supplylinePool;
 }
@@ -111,12 +123,13 @@ export function initSaturnPool(): Pool {
     database: config.database,
     waitForConnections: true,
     connectionLimit: Number(process.env.SATURN_DB_POOL_LIMIT ?? 5),
+    connectTimeout: Number(process.env.DB_CONNECT_TIMEOUT_MS ?? 5_000),
     enableKeepAlive: true,
-    keepAliveInitialDelay: 0,
+    keepAliveInitialDelay: Number(process.env.DB_KEEPALIVE_DELAY_MS ?? 10_000),
+    timezone: '+00:00',
     charset: 'utf8mb4',
   });
 
-  attachUtcTimezone(saturnPool);
   return saturnPool;
 }
 
@@ -127,22 +140,46 @@ export function getSaturnPool(): Pool {
   return saturnPool;
 }
 
+export async function warmSupplylinePool(): Promise<void> {
+  try {
+    await query('SELECT 1');
+    console.log('[database] SupplyLine pool ready');
+  } catch (error) {
+    console.warn('[database] SupplyLine pool warmup failed:', error);
+  }
+}
+
+async function runWithPool<T>(operation: (pool: Pool) => Promise<T>): Promise<T> {
+  const pool = getSupplylinePool();
+
+  try {
+    return await operation(pool);
+  } catch (error) {
+    if (!isRetryableConnectionError(error)) {
+      throw error;
+    }
+    return operation(pool);
+  }
+}
+
 export async function query<T extends RowDataPacket[]>(
   sql: string,
   params?: QueryParams
 ): Promise<T> {
-  const pool = getSupplylinePool();
-  const [rows] = await pool.execute<T>(sql, params);
-  return rows;
+  return runWithPool(async (pool) => {
+    const [rows] = await pool.execute<T>(sql, params);
+    return rows;
+  });
 }
 
 export async function execute(
   sql: string,
   params?: QueryParams
 ): Promise<ResultSetHeader> {
-  const pool = getSupplylinePool();
-  const [result] = await pool.execute<ResultSetHeader>(sql, params);
-  return result;
+  return runWithPool(async (pool) => {
+    const [result] = await pool.execute<ResultSetHeader>(sql, params);
+    return result;
+  });
 }
 
 export async function saturnQuery<T extends RowDataPacket[]>(
@@ -155,15 +192,11 @@ export async function saturnQuery<T extends RowDataPacket[]>(
 }
 
 export async function getConnection(): Promise<PoolConnection> {
-  const connection = await getSupplylinePool().getConnection();
-  await connection.query("SET time_zone = '+00:00'");
-  return connection;
+  return getSupplylinePool().getConnection();
 }
 
 export async function getSaturnConnection(): Promise<PoolConnection> {
-  const connection = await getSaturnPool().getConnection();
-  await connection.query("SET time_zone = '+00:00'");
-  return connection;
+  return getSaturnPool().getConnection();
 }
 
 export async function closeSupplylinePool(): Promise<void> {

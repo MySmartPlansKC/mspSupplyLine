@@ -1,9 +1,9 @@
 import { NextFunction, Response } from 'express';
+import { normalizeUserRole } from '../constants/userRoles';
 import { extractAuthCookieToken } from '../utilities/authCookie';
 import { verifyAccessToken } from '../utilities/jwt';
 import { UnauthorizedError } from '../utilities/httpErrors';
-import { UserRepository } from '../repositories/UserRepository';
-import { AuthRequest } from '../types/auth';
+import { AuthRequest, AuthenticatedUser, JwtPayload } from '../types/auth';
 
 function extractBearerToken(header: string | undefined): string | null {
   if (!header) return null;
@@ -14,6 +14,23 @@ function extractBearerToken(header: string | undefined): string | null {
 
 function extractAccessToken(req: AuthRequest): string | null {
   return extractBearerToken(req.headers.authorization) ?? extractAuthCookieToken(req);
+}
+
+function userFromJwtPayload(payload: JwtPayload): AuthenticatedUser | null {
+  const role = normalizeUserRole(payload.role);
+  if (!role) {
+    return null;
+  }
+
+  return {
+    userId: payload.sub,
+    email: payload.email,
+    role,
+    clientId: payload.clientId,
+    firstName: null,
+    lastName: null,
+    preferredLocale: null,
+  };
 }
 
 export async function authenticateJwt(
@@ -28,21 +45,12 @@ export async function authenticateJwt(
     }
 
     const payload = verifyAccessToken(token);
-    const user = await UserRepository.findById(payload.sub);
-    if (!user || !user.IsActive) {
+    const user = userFromJwtPayload(payload);
+    if (!user) {
       throw new UnauthorizedError();
     }
 
-    req.user = {
-      userId: user.UserID,
-      email: user.Email,
-      role: user.Role,
-      clientId: user.ClientID,
-      firstName: user.FirstName,
-      lastName: user.LastName,
-      preferredLocale: user.PreferredLocale,
-    };
-
+    req.user = user;
     next();
   } catch (error) {
     next(error);

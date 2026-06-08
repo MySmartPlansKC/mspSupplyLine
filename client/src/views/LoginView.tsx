@@ -1,13 +1,16 @@
-import { FormEvent, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { FormEvent, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FetchWrapperError } from '../api/fetchWrapper';
 import Button from '../components/Common/Button';
 import Input from '../components/Common/Input';
 import Logo from '../components/Common/Logo';
-import { useAuth } from '../context/AuthContext';
+import { AUTH_SERVER_NOTICE_KEY, useAuth } from '../context/AuthContext';
 
 function toDisplayError(error: unknown): string {
   if (error instanceof FetchWrapperError) {
+    if (error.status === 0) {
+      return 'Unable to reach the SupplyLine API. Confirm the server is running, then try again.';
+    }
     if (error.status === 401) return 'Invalid email or password.';
     if (error.status === 400) return 'Please provide a valid email and password.';
     return error.message || 'Login failed.';
@@ -18,11 +21,18 @@ function toDisplayError(error: unknown): string {
 export default function LoginView() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const [email, setEmail] = useState(import.meta.env.VITE_DEV_LOGIN_EMAIL ?? '');
   const [password, setPassword] = useState(import.meta.env.VITE_DEV_LOGIN_PASSWORD ?? '');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const notice = sessionStorage.getItem(AUTH_SERVER_NOTICE_KEY);
+    if (notice) {
+      setErrorMessage(notice);
+      sessionStorage.removeItem(AUTH_SERVER_NOTICE_KEY);
+    }
+  }, []);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -31,8 +41,7 @@ export default function LoginView() {
 
     try {
       await login(email, password);
-      const redirect = (location.state as { from?: string } | null)?.from;
-      navigate(redirect ?? '/dashboard', { replace: true });
+      navigate('/dashboard', { replace: true });
     } catch (error) {
       setErrorMessage(toDisplayError(error));
     } finally {
@@ -74,7 +83,7 @@ export default function LoginView() {
       </section>
 
       {/* RIGHT SIDE PANEL: INTERACTIVE AUTHENTICATION GATEWAY */}
-      <section className="flex w-full flex-col justify-center px-6 sm:px-12 md:px-24 lg:w-1/2 xl:px-36">
+      <section className="flex w-full flex-col justify-center px-4 py-8 sm:px-12 md:px-24 lg:w-1/2 xl:px-36">
         <div className="mx-auto w-full max-w-sm space-y-6">
           
           <div className="mb-2 lg:hidden">

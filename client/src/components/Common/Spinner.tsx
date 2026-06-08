@@ -5,27 +5,29 @@ export type SpinnerVariant = 'default' | 'brand';
 
 export interface SpinnerProps extends HTMLAttributes<HTMLDivElement> {
   size?: SpinnerSize;
-  /** default = neutral; brand = SupplyLine blue → emerald conic ring */
+  /** default = neutral arc; brand = SupplyLine blue → emerald ring */
   variant?: SpinnerVariant;
-  /** Inner cutout color for brand variant (match parent surface). */
+  /** Inner cutout — match the surface behind the hole (e.g. parent box bg). */
   wellClassName?: string;
 }
 
 const sizeMap: Record<SpinnerSize, string> = {
-  sm: 'h-4 w-4',
-  md: 'h-6 w-6',
-  lg: 'h-9 w-9',
+  sm: 'h-5 w-5',
+  md: 'h-9 w-9',
+  lg: 'h-12 w-12',
 };
 
+/** Larger inset = thinner ring band around the hollow center. */
 const insetMap: Record<SpinnerSize, string> = {
-  sm: 'inset-[2px]',
-  md: 'inset-[2.5px]',
-  lg: 'inset-[3px]',
+  sm: 'inset-[3px]',
+  md: 'inset-[4px]',
+  lg: 'inset-[6px]',
 };
 
 const variantMap: Record<SpinnerVariant, string> = {
   default: 'border-2 border-slate-300 border-t-current rounded-full animate-spin',
-  brand: 'rounded-full animate-spin bg-[conic-gradient(from_0deg,#3b82f6,#10b981,#3b82f6)]',
+  brand:
+    'rounded-full animate-spin bg-[conic-gradient(from_0deg,#2563eb_0deg,#10b981_220deg,#2563eb_360deg)]',
 };
 
 function joinClasses(...values: Array<string | undefined | false>): string {
@@ -35,7 +37,7 @@ function joinClasses(...values: Array<string | undefined | false>): string {
 export function Spinner({
   size = 'md',
   variant = 'default',
-  wellClassName = 'bg-slate-950',
+  wellClassName = 'bg-white',
   className,
   ...props
 }: SpinnerProps) {
@@ -49,11 +51,8 @@ export function Spinner({
       >
         <div className={joinClasses('absolute inset-0', variantMap.brand)} />
         <div
-          className={joinClasses(
-            'absolute rounded-full',
-            insetMap[size],
-            wellClassName
-          )}
+          className={joinClasses('absolute rounded-full', insetMap[size], wellClassName)}
+          aria-hidden="true"
         />
       </div>
     );

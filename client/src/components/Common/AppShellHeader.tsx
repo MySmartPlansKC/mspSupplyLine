@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import DevLoadingPreviewToggle from './DevLoadingPreviewToggle';
 import Logo from './Logo';
 
 export type AppShellAccent = 'blue' | 'emerald' | 'neutral';
@@ -23,28 +24,29 @@ export default function AppShellHeader({
   accent = 'blue',
 }: AppShellHeaderProps) {
   return (
-    <header className="flex h-14 w-full select-none items-center justify-between border-b border-slate-800 bg-slate-900 px-4">
-      {/* Left: brand mark + dual-level page context */}
-      <div className="flex min-w-0 flex-1 items-center gap-4">
-        <Logo showText theme="dark" size="header" className="shrink-0" />
+    <header className="flex min-h-14 w-full flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-slate-800 bg-slate-900 px-3 py-2 sm:px-4">
+      <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-4">
+        <Logo showText theme="dark" size="header" className="shrink-0 max-sm:[&>div:last-child]:hidden" />
 
-        <div className="flex min-w-0 flex-col justify-center border-l border-slate-700 pl-4">
+        <div className="flex min-w-0 flex-1 flex-col justify-center border-l border-slate-700 pl-2 sm:pl-4">
           <h1
-            className={`truncate text-lg font-semibold uppercase leading-none tracking-wider ${titleAccentClass[accent]}`}
+            className={`truncate text-sm font-semibold uppercase leading-none tracking-wider sm:text-lg ${titleAccentClass[accent]}`}
           >
             {title}
           </h1>
           {subtitle ? (
-            <p className="mt-0.5 truncate text-xs font-normal leading-tight text-slate-400">
+            <p className="mt-0.5 hidden min-w-0 truncate text-xs font-normal leading-tight text-slate-400 sm:block">
               {subtitle}
             </p>
           ) : null}
         </div>
       </div>
 
-      {/* Right: flat action siblings — no nested wrappers */}
-      {actions ? (
-        <div className="ml-auto flex shrink-0 items-center gap-3">{actions}</div>
+      {import.meta.env.DEV || actions ? (
+        <div className="ml-auto flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
+          {import.meta.env.DEV ? <DevLoadingPreviewToggle /> : null}
+          {actions}
+        </div>
       ) : null}
     </header>
   );

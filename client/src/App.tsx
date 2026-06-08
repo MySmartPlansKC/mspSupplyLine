@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from './components/Common/ProtectedRoute';
 import PlatformRoute from './components/Common/PlatformRoute';
 import { useAuth } from './context/AuthContext';
@@ -8,11 +8,7 @@ import CatalogView from './views/CatalogView';
 import StagingQueueView from './views/StagingQueueView';
 
 function LoginEntry() {
-  const { user, initializing } = useAuth();
-
-  if (initializing) {
-    return null;
-  }
+  const { user } = useAuth();
 
   if (user) {
     return <Navigate to="/dashboard" replace />;
@@ -21,10 +17,8 @@ function LoginEntry() {
   return <LoginView />;
 }
 
-/** Legacy path; preserves `state.from` for post-login redirect. */
 function LoginAlias() {
-  const location = useLocation();
-  return <Navigate to="/" replace state={location.state} />;
+  return <Navigate to="/" replace />;
 }
 
 export default function App() {
@@ -41,7 +35,7 @@ export default function App() {
         </Route>
       </Route>
 
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

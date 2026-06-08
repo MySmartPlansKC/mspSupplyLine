@@ -6,13 +6,14 @@ interface ProjectSubNavTabsProps {
 }
 
 function tabClassName(isActive: boolean, isStagingTab: boolean): string {
+  const base = 'rounded px-2.5 py-1.5 text-xs font-semibold transition text-center';
   if (isActive) {
     return [
-      'rounded px-2.5 py-1.5 text-xs font-semibold transition',
+      base,
       isStagingTab ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white',
     ].join(' ');
   }
-  return 'rounded border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-slate-700';
+  return `${base} border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700`;
 }
 
 export default function ProjectSubNavTabs({ projectId }: ProjectSubNavTabsProps) {
@@ -28,19 +29,19 @@ export default function ProjectSubNavTabs({ projectId }: ProjectSubNavTabsProps)
 
   return (
     <nav
-      className="flex flex-wrap items-center gap-1 rounded border border-slate-800 bg-slate-900 p-1"
+      className="flex w-full min-w-0 items-center gap-1 rounded border border-slate-800 bg-slate-900 p-1 sm:w-auto"
       aria-label="Project phase navigation"
     >
       <NavLink
         to={catalogPath}
-        className={() => tabClassName(location.pathname === catalogPath, false)}
+        className={() => `${tabClassName(location.pathname === catalogPath, false)} flex-1 sm:flex-initial`}
       >
         Catalog
       </NavLink>
       {showStaging ? (
         <NavLink
           to={stagingPath}
-          className={() => tabClassName(location.pathname === stagingPath, true)}
+          className={() => `${tabClassName(location.pathname === stagingPath, true)} flex-1 sm:flex-initial`}
         >
           Staging Queue
         </NavLink>

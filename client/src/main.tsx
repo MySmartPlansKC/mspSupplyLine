@@ -4,14 +4,19 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import ErrorBoundary from './components/Feedback/ErrorBoundary';
 import { AuthProvider } from './context/AuthContext';
+import { DevLoadingPreviewProvider } from './context/DevLoadingPreviewContext';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
-      <BrowserRouter>
+      <BrowserRouter
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <AuthProvider>
-          <App />
+          <DevLoadingPreviewProvider>
+            <App />
+          </DevLoadingPreviewProvider>
         </AuthProvider>
       </BrowserRouter>
     </ErrorBoundary>

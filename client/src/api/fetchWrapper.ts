@@ -3,6 +3,8 @@ export interface FetchWrapperOptions extends Omit<RequestInit, 'body'> {
   body?: unknown;
   skipAuth?: boolean;
   skipSessionDrop?: boolean;
+  /** Abort the request after this many milliseconds. */
+  timeoutMs?: number;
 }
 
 export class FetchWrapperError extends Error {
@@ -33,6 +35,7 @@ const NETWORK_ERROR_MARKERS = [
   'ERR_CONNECTION_RESET',
   'ERR_TIMED_OUT',
 ];
+
 
 function buildUrl(endpoint: string): string {
   const cleaned = endpoint.replace(/^\/+/, '');
@@ -88,6 +91,7 @@ export async function fetchWrapper<T = unknown>({
   body,
   skipAuth = false,
   skipSessionDrop = false,
+  timeoutMs,
   headers,
   ...options
 }: FetchWrapperOptions): Promise<T> {
@@ -114,6 +118,13 @@ export async function fetchWrapper<T = unknown>({
     console.log(`[SupplyLine API] ${method} ${url}`);
   }
 
+  const controller = new AbortController();
+  const resolvedTimeoutMs = timeoutMs;
+  const timeoutId =
+    resolvedTimeoutMs !== undefined
+      ? window.setTimeout(() => controller.abort(), resolvedTimeoutMs)
+      : undefined;
+
   try {
     const response = await fetch(url, {
       ...options,
@@ -121,6 +132,7 @@ export async function fetchWrapper<T = unknown>({
       headers: requestHeaders,
       body: requestBody,
       credentials: skipAuth ? 'same-origin' : 'include',
+      signal: controller.signal,
     });
 
     const payload = await parseResponseBody(response);
@@ -140,20 +152,28 @@ export async function fetchWrapper<T = unknown>({
     }
 
     const message = error instanceof Error ? error.message : String(error);
+    const timedOut = error instanceof DOMException && error.name === 'AbortError';
     const isNetworkError =
-      error instanceof TypeError &&
-      NETWORK_ERROR_MARKERS.some((marker) => message.includes(marker));
+      timedOut ||
+      (error instanceof TypeError &&
+        NETWORK_ERROR_MARKERS.some((marker) => message.includes(marker)));
 
     if (isNetworkError && import.meta.env.DEV) {
-      console.error('[SupplyLine API] server unavailable:', message);
+      console.error('[SupplyLine API] request failed:', timedOut ? 'timeout' : message);
     }
 
     throw new FetchWrapperError(
-      isNetworkError
-        ? 'Unable to reach the server. Confirm API is running.'
-        : message,
+      timedOut
+        ? 'The server took too long to respond.'
+        : isNetworkError
+          ? 'Unable to reach the server. Confirm API is running.'
+          : message,
       0,
       null
     );
+  } finally {
+    if (timeoutId !== undefined) {
+      window.clearTimeout(timeoutId);
+    }
   }
 }

@@ -75,11 +75,12 @@ export function projectStatusBadgeVariant(status: string | null | undefined): Ba
   return 'warning';
 }
 
-export type ReviewStatus = 'Pending' | 'Approved' | 'Rejected';
+export type ReviewStatus = 'Processing' | 'Pending' | 'Approved' | 'Rejected';
 
 export function formatReviewStatusLabel(status: ReviewStatus): string {
   const labels: Record<ReviewStatus, string> = {
-    Pending: 'Pending',
+    Processing: 'Extracting',
+    Pending: 'Pending review',
     Approved: 'Approved',
     Rejected: 'Rejected',
   };
@@ -89,6 +90,7 @@ export function formatReviewStatusLabel(status: ReviewStatus): string {
 export function reviewStatusBadgeVariant(status: ReviewStatus): BadgeVariant {
   if (status === 'Approved') return 'success';
   if (status === 'Rejected') return 'danger';
+  if (status === 'Processing') return 'warning';
   return 'warning';
 }
 

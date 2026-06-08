@@ -103,11 +103,11 @@ export default function DiagnosticModal({
 
   return (
     <div
-      className="fixed inset-0 z-[1000] grid place-items-center bg-slate-950/75 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[1000] flex items-end justify-center bg-slate-950/75 p-0 backdrop-blur-sm sm:items-center sm:p-4"
       role="presentation"
     >
       <section
-        className="grid w-full max-w-lg gap-4 overflow-hidden rounded border border-slate-700 bg-slate-900 p-5 shadow-2xl ring-1 ring-blue-500/20"
+        className="grid max-h-[100dvh] w-full min-w-0 max-w-2xl gap-4 overflow-auto rounded-t-xl border border-slate-700 bg-slate-900 p-4 shadow-2xl ring-1 ring-blue-500/20 sm:max-h-[calc(100vh-2rem)] sm:rounded sm:p-5"
         role="dialog"
         aria-modal="true"
         aria-labelledby="diag-title"
@@ -132,17 +132,19 @@ export default function DiagnosticModal({
 
         <div className="rounded border border-red-500/30 bg-red-950/40 px-3 py-2.5">
           <p className="text-sm font-semibold text-red-300">{payload.errorName}</p>
-          <p className="mt-1 text-base leading-snug text-red-100">{payload.errorMessage}</p>
+          <p className="mt-1 break-words text-base leading-snug text-red-100">
+            {payload.errorMessage}
+          </p>
           <p className="mt-2 text-xs text-red-300/80">
             {formatTimestamp(payload.timestamp)}
           </p>
         </div>
 
-        <details className="group rounded border border-slate-800 bg-slate-950/60">
+        <details className="group min-w-0 overflow-hidden rounded border border-slate-800 bg-slate-950/60">
           <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-400 hover:text-slate-300">
             Technical details
           </summary>
-          <pre className="max-h-36 overflow-auto border-t border-slate-800 px-3 py-2 font-mono text-[10px] leading-relaxed text-slate-500">
+          <pre className="max-h-48 overflow-auto overscroll-contain border-t border-slate-800 px-3 py-2 font-mono text-[10px] leading-relaxed whitespace-pre-wrap break-words text-slate-500">
             {compactTechnical}
           </pre>
         </details>
@@ -156,14 +158,14 @@ export default function DiagnosticModal({
           </p>
         ) : null}
 
-        <div className="flex flex-wrap justify-end gap-2 border-t border-slate-800 pt-4">
-          <Button type="button" variant="secondary" onClick={handleCopyDetails}>
+        <div className="flex flex-col-reverse gap-2 border-t border-slate-800 pt-4 sm:flex-row sm:flex-wrap sm:justify-end">
+          <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={handleCopyDetails}>
             Copy report
           </Button>
-          <Button type="button" variant="secondary" onClick={onReload}>
+          <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={onReload}>
             Reload
           </Button>
-          <Button type="button" variant="secondary" onClick={onDismiss}>
+          <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={onDismiss}>
             Dismiss
           </Button>
         </div>

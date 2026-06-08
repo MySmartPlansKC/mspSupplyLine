@@ -132,6 +132,48 @@ export class SubmittalDocumentRepository {
     );
   }
 
+  static async insertProcessingDocumentDirect(input: {
+    documentId: string;
+    projectId: number;
+    sourceType: SubmittalSourceType;
+    fileTitle: string;
+    fileHash: string;
+    uploadedBy: string;
+  }): Promise<void> {
+    await execute(
+      `INSERT INTO sl_SubmittalDocuments (
+        DocumentID,
+        ProjectID,
+        SourceType,
+        FileTitle,
+        FileHash,
+        ProcessingStatus,
+        UploadedBy
+      ) VALUES (?, ?, ?, ?, ?, 'Processing', ?)`,
+      [
+        input.documentId,
+        input.projectId,
+        input.sourceType,
+        input.fileTitle,
+        input.fileHash,
+        input.uploadedBy,
+      ]
+    );
+  }
+
+  static async setProcessingStatus(
+    documentId: string,
+    processingStatus: ProcessingStatus,
+    errorMessage: string | null = null
+  ): Promise<void> {
+    await execute(
+      `UPDATE sl_SubmittalDocuments
+       SET ProcessingStatus = ?, ErrorMessage = ?
+       WHERE DocumentID = ?`,
+      [processingStatus, errorMessage, documentId]
+    );
+  }
+
   static async updateStatus(
     connection: PoolConnection,
     documentId: string,
@@ -165,5 +207,34 @@ export class SubmittalDocumentRepository {
     );
 
     return rows.map(mapSubmittalDocumentRow);
+  }
+
+  static async findByIdWithConnection(
+    connection: PoolConnection,
+    projectId: number,
+    documentId: string
+  ): Promise<SubmittalDocumentRecord | null> {
+    const [rows] = await connection.execute<SubmittalDocumentRow[]>(
+      `SELECT
+          DocumentID,
+          ProjectID,
+          SourceType,
+          FileTitle,
+          FileHash,
+          ProcessingStatus,
+          ErrorMessage,
+          UploadedBy,
+          CreatedAt
+       FROM sl_SubmittalDocuments
+       WHERE DocumentID = ? AND ProjectID = ?
+       LIMIT 1`,
+      [documentId, projectId]
+    );
+
+    if (rows.length === 0) {
+      return null;
+    }
+
+    return mapSubmittalDocumentRow(rows[0]);
   }
 }

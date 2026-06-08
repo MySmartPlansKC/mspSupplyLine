@@ -10,6 +10,7 @@ import Input from '../components/Common/Input';
 import LoadingIndicator from '../components/Common/LoadingIndicator';
 import { Spinner } from '../components/Common/Spinner';
 import { useAuth } from '../context/AuthContext';
+import { useDevLoadingPreview } from '../context/DevLoadingPreviewContext';
 
 interface ProjectSummary {
   projectId: number;
@@ -150,6 +151,8 @@ export default function DashboardView() {
   } = useAuth();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const showLoading = loading;
+  const { previewLoading } = useDevLoadingPreview();
   const [error, setError] = useState<string | null>(null);
 
   const [createPaneOpen, setCreatePaneOpen] = useState(false);
@@ -333,19 +336,21 @@ export default function DashboardView() {
   ]);
 
   const headerActions = (
-    <>
+    <div className="flex flex-wrap items-center justify-end gap-2">
       {canImpersonateClientView ? (
         <Button
           type="button"
           variant={viewMode === 'client' ? 'primary' : 'success'}
+          size="sm"
           aria-pressed={viewMode === 'client'}
+          className="max-w-full whitespace-normal sm:whitespace-nowrap"
           onClick={() => setViewMode(viewMode === 'admin' ? 'client' : 'admin')}
         >
           {viewMode === 'admin' ? 'Toggle User View' : 'Toggle Admin View'}
         </Button>
       ) : null}
       <AppShellSignOut />
-    </>
+    </div>
   );
 
   return (
@@ -362,8 +367,23 @@ export default function DashboardView() {
           actions={headerActions}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start w-full px-1">
-          <section className="flex min-w-0 flex-col gap-6">
+        {showLoading ? (
+          <LoadingIndicator label="Loading project scope..." />
+        ) : null}
+
+        {previewLoading ? (
+          <LoadingIndicator label="Loading preview (dev)..." />
+        ) : null}
+
+        {error ? (
+          <p className="rounded border-l-2 border-red-500 bg-red-50/80 p-2">
+            {error}
+          </p>
+        ) : null}
+
+        {!showLoading && !error ? (
+        <div className="sl-page-layout">
+          <section className="sl-page-main">
             {canImpersonateClientView && viewMode === 'client' ? (
               <p className="rounded border-l-2 border-amber-500 bg-amber-50/60 px-2 py-1.5">
                 User preview is active. Staging queue actions are hidden to match client access.
@@ -373,21 +393,20 @@ export default function DashboardView() {
             {canProvisionProjects ? (
               <div className="space-y-2">
                 {!createPaneOpen ? (
-                  <Button type="button" onClick={() => setCreatePaneOpen(true)}>
+                  <Button type="button" className="w-full sm:w-auto" onClick={() => setCreatePaneOpen(true)}>
                     + New Project
                   </Button>
                 ) : null}
 
                 {createPaneOpen ? (
                   <div className="space-y-3 rounded border border-slate-200/70 bg-white p-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="uppercase tracking-wider">
-                        Provision Project
-                      </span>
-                      <div className="flex gap-1">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                      <span className="uppercase tracking-wider">Provision Project</span>
+                      <div className="grid grid-cols-1 gap-1 sm:flex sm:gap-1">
                         <Button
                           type="button"
                           variant={createMode === 'cleanSlate' ? 'primary' : 'secondary'}
+                          className="w-full sm:w-auto"
                           onClick={() => {
                             setCreateMode('cleanSlate');
                             setProvisionForm(EMPTY_PROVISION_FORM);
@@ -399,6 +418,7 @@ export default function DashboardView() {
                         <Button
                           type="button"
                           variant={createMode === 'saturnImport' ? 'primary' : 'secondary'}
+                          className="w-full sm:w-auto"
                           onClick={() => {
                             setCreateMode('saturnImport');
                             setProvisionForm(EMPTY_PROVISION_FORM);
@@ -553,9 +573,10 @@ export default function DashboardView() {
                       </p>
                     ) : null}
 
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row">
                       <Button
                         type="button"
+                        className="w-full sm:w-auto"
                         disabled={createBusy || !canSubmitProvision}
                         onClick={() => void handleCreateProject()}
                       >
@@ -564,6 +585,7 @@ export default function DashboardView() {
                       <Button
                         type="button"
                         variant="secondary"
+                        className="w-full sm:w-auto"
                         disabled={createBusy}
                         onClick={() => {
                           resetCreateForm();
@@ -578,17 +600,6 @@ export default function DashboardView() {
               </div>
             ) : null}
 
-            {loading ? (
-              <LoadingIndicator label="Loading project scope..." spinnerSize="sm" />
-            ) : null}
-
-            {error ? (
-              <p className="rounded border-l-2 border-red-500 bg-red-50/80 p-2">
-                {error}
-              </p>
-            ) : null}
-
-            {!loading && !error ? (
               <Card
                 heading="Operational Project Registry"
                 subheading="Scoped deployment nodes available to your identity context."
@@ -599,31 +610,62 @@ export default function DashboardView() {
                     No scoped projects were returned for this user.
                   </p>
                 ) : (
-                  <div className="space-y-1 p-2">
-                    <div className="grid grid-cols-[minmax(0,1fr)_180px_104px_96px_140px] items-baseline gap-3 rounded border border-slate-200/60 bg-slate-50 px-3 py-1.5 uppercase tracking-wider select-none">
+                  <div className="space-y-2 p-2">
+                    <div className="hidden items-baseline gap-3 rounded border border-slate-200/60 bg-slate-50 px-3 py-1.5 uppercase tracking-wider select-none lg:grid lg:grid-cols-[minmax(0,1fr)_180px_104px_96px_140px]">
                       <span>Project</span>
-                      <span className="hidden sm:block">Location</span>
-                      <span className="hidden sm:block">PID</span>
-                      <span className="hidden sm:block">Status</span>
+                      <span>Location</span>
+                      <span>PID</span>
+                      <span>Status</span>
                       <span className="text-right pr-2">Actions</span>
                     </div>
-                    {projects.map((project) => (
-                      <div
-                        key={project.projectId}
-                        className="grid grid-cols-[minmax(0,1fr)_180px_104px_96px_140px] items-baseline gap-3 rounded border border-slate-200/60 border-l-4 border-l-blue-600 bg-white px-3 py-2.5 transition-colors duration-150 hover:bg-slate-50"
-                      >
+                    {projects.map((project) => {
+                      const locationLabel =
+                        [project.projectCity, project.projectState].filter(Boolean).join(', ') ||
+                        '—';
+
+                      return (
+                      <div key={project.projectId}>
+                        <article className="space-y-3 rounded border border-slate-200/60 border-l-4 border-l-blue-600 bg-white p-3 transition-colors hover:bg-slate-50 lg:hidden">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <span className="min-w-0 flex-1 font-semibold break-words">
+                              {project.projectName}
+                            </span>
+                            <Badge variant={projectStatusBadgeVariant(project.projectStatus)}>
+                              {project.projectStatus ?? 'Active'}
+                            </Badge>
+                          </div>
+                          <dl className="grid grid-cols-[4.5rem_1fr] gap-x-3 gap-y-1.5 text-sm">
+                            <dt className="text-slate-500">Location</dt>
+                            <dd className="text-slate-700">{locationLabel}</dd>
+                            <dt className="text-slate-500">PID</dt>
+                            <dd className="text-slate-700">PID-{project.projectId}</dd>
+                          </dl>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button
+                              className="w-full shadow-none"
+                              onClick={() => navigate(`/projects/${project.projectId}/catalog`)}
+                            >
+                              Catalog
+                            </Button>
+                            {stagingVisible ? (
+                              <Button
+                                variant="success"
+                                className="w-full shadow-none"
+                                onClick={() => navigate(`/projects/${project.projectId}/staging`)}
+                              >
+                                Staging
+                              </Button>
+                            ) : null}
+                          </div>
+                        </article>
+
+                        <div className="hidden items-baseline gap-3 rounded border border-slate-200/60 border-l-4 border-l-blue-600 bg-white px-3 py-2.5 transition-colors duration-150 hover:bg-slate-50 lg:grid lg:grid-cols-[minmax(0,1fr)_180px_104px_96px_140px]">
                         <span className="truncate font-semibold">
                           {project.projectName}
                         </span>
-                        <span className="hidden truncate sm:block">
-                          {[project.projectCity, project.projectState]
-                            .filter(Boolean)
-                            .join(', ') || '—'}
-                        </span>
-                        <span className="hidden sm:block">
-                          PID-{project.projectId}
-                        </span>
-                        <span className="hidden sm:inline-block">
+                        <span className="truncate">{locationLabel}</span>
+                        <span>PID-{project.projectId}</span>
+                        <span>
                           <Badge variant={projectStatusBadgeVariant(project.projectStatus)}>
                             {project.projectStatus ?? 'Active'}
                           </Badge>
@@ -645,15 +687,16 @@ export default function DashboardView() {
                             </Button>
                           ) : null}
                         </div>
+                        </div>
                       </div>
-                    ))}
+                    );
+                    })}
                   </div>
                 )}
               </Card>
-            ) : null}
           </section>
 
-          <aside className="bg-slate-950 text-slate-100 rounded border border-slate-800 p-4 space-y-6 shadow-xl">
+          <aside className="sl-page-rail">
             <div>
               <div className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-2">
                 System Status Node
@@ -731,6 +774,7 @@ export default function DashboardView() {
             ) : null}
           </aside>
         </div>
+        ) : null}
       </div>
     </main>
   );

@@ -1,6 +1,6 @@
 export type StagingSourceType = 'InternalProject' | 'ExternalImport';
 
-export type StagingReviewStatus = 'Pending' | 'Approved' | 'Rejected';
+export type StagingReviewStatus = 'Processing' | 'Pending' | 'Approved' | 'Rejected';
 
 export interface SlStaging {
   StagingID: string;
@@ -9,6 +9,14 @@ export interface SlStaging {
   ExternalRecordRef: string | null;
   CategoryName: string | null;
   Manufacturer: string | null;
+  ManufacturerID: number | null;
+  ExtractedManufacturer: string | null;
+  ExtractedMfgAddress: string | null;
+  ExtractedMfgPhone: string | null;
+  ExtractedMfgWebsite: string | null;
+  ExtractedMfgContact: string | null;
+  StagedAddress: string | null;
+  StagedPhone: string | null;
   ModelNumber: string | null;
   Description: string | null;
   LocationInBuilding: string | null;

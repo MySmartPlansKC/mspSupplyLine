@@ -7,6 +7,11 @@ import {
 import { SubmittalDocumentRepository } from '../repositories/SubmittalDocumentRepository';
 import { processSubmittalPDF } from './pdfExtractionService';
 import {
+  deleteSubmittalPdf,
+  readSubmittalPdf,
+  saveSubmittalPdf,
+} from './submittalFileStorage';
+import {
   BadRequestError,
   ConflictError,
   isDuplicateEntryError,
@@ -28,15 +33,26 @@ function parseQuantity(value: unknown): number | null {
   return parsed;
 }
 
+function trimOptional(value: unknown, maxLength: number): string | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const trimmed = String(value).trim();
+  if (!trimmed) {
+    return null;
+  }
+  return trimmed.slice(0, maxLength);
+}
+
 function validatePdfDerivedItems(items: StagingIngestInput[]): StagingIngestInput[] {
   if (items.length === 0) {
     throw new BadRequestError('PDF extraction produced no staging items');
   }
 
   return items.map((item, index) => {
-    const manufacturer = trimString(item.manufacturer);
-    if (!manufacturer) {
-      throw new BadRequestError(`Item at index ${index}: manufacturer is required`);
+    const extractedManufacturer = trimString(item.extractedManufacturer);
+    if (!extractedManufacturer) {
+      throw new BadRequestError(`Item at index ${index}: extractedManufacturer is required`);
     }
 
     const modelNumber = trimString(item.modelNumber);
@@ -62,7 +78,11 @@ function validatePdfDerivedItems(items: StagingIngestInput[]): StagingIngestInpu
     return {
       externalRecordRef: trimString(item.externalRecordRef) || null,
       categoryName: trimString(item.categoryName) || null,
-      manufacturer,
+      extractedManufacturer,
+      extractedMfgAddress: trimOptional(item.extractedMfgAddress, 500),
+      extractedMfgPhone: trimOptional(item.extractedMfgPhone, 50),
+      extractedMfgWebsite: trimOptional(item.extractedMfgWebsite, 255),
+      extractedMfgContact: trimOptional(item.extractedMfgContact, 255),
       modelNumber,
       description: trimString(item.description) || null,
       quantity,
@@ -91,41 +111,99 @@ export interface AssemblyLineIngestInput {
   fileTitle: string;
 }
 
-export interface AssemblyLineIngestResult {
+export interface SubmittalIngestAccepted {
   documentId: string;
-  processingStatus: 'AwaitingReview';
-  inserted: number;
-  stagingIds: string[];
+  processingStatus: 'Processing';
+  stagingPlaceholderId: string;
+  storedRelativePath: string;
 }
 
-export async function ingestSubmittalPdf(
-  input: AssemblyLineIngestInput
-): Promise<AssemblyLineIngestResult> {
-  const fileHash = hashFileBuffer(input.fileBuffer);
-  const fileTitle = resolveFileTitle(input.fileTitle);
+export interface SubmittalIngestBackgroundJob {
+  documentId: string;
+  projectId: number;
+  uploadedBy: string;
+  storedRelativePath: string;
+  fileTitle: string;
+}
 
+async function resolveIngestConflict(
+  projectId: number,
+  fileHash: string,
+  fileTitle: string
+): Promise<void> {
   const conflict = await SubmittalDocumentRepository.findConflictingDocument(
-    input.projectId,
+    projectId,
     fileHash,
     fileTitle
   );
 
-  if (conflict) {
-    if (conflict.processingStatus === 'Error') {
-      await SubmittalDocumentRepository.deleteById(input.projectId, conflict.documentId);
-    } else if (conflict.reason === 'hash') {
-      throw new ConflictError(
-        'Submittal file already ingested for this project (duplicate content hash).'
-      );
-    } else {
-      throw new ConflictError(
-        'Submittal file already ingested for this project (duplicate file title).'
-      );
-    }
+  if (!conflict) {
+    return;
   }
 
+  if (conflict.processingStatus === 'Error') {
+    await SubmittalDocumentRepository.deleteById(projectId, conflict.documentId);
+    return;
+  }
+
+  if (conflict.reason === 'hash') {
+    throw new ConflictError(
+      'Submittal file already ingested for this project (duplicate content hash).'
+    );
+  }
+
+  throw new ConflictError(
+    'Submittal file already ingested for this project (duplicate file title).'
+  );
+}
+
+function truncateErrorMessage(error: unknown): string {
+  const message =
+    error instanceof BadRequestError || error instanceof Error
+      ? error.message
+      : 'PDF submittal parsing failed';
+  return message.slice(0, 2000);
+}
+
+async function markSubmittalIngestFailed(
+  documentId: string,
+  error: unknown
+): Promise<void> {
+  try {
+    await SubmittalDocumentRepository.setProcessingStatus(
+      documentId,
+      'Error',
+      truncateErrorMessage(error)
+    );
+  } catch (statusError) {
+    console.error('[assemblyLineIngest] Failed to mark document as Error:', statusError);
+  }
+}
+
+/**
+ * Persists the PDF, creates document + staging placeholder rows, returns immediately for HTTP 202.
+ */
+export async function acceptSubmittalPdfIngest(
+  input: AssemblyLineIngestInput
+): Promise<SubmittalIngestAccepted> {
+  const fileHash = hashFileBuffer(input.fileBuffer);
+  const fileTitle = resolveFileTitle(input.fileTitle);
+
+  await resolveIngestConflict(input.projectId, fileHash, fileTitle);
+
   const documentId = randomUUID();
+  let storedRelativePath: string | null = null;
+
+  try {
+    storedRelativePath = await saveSubmittalPdf(input.projectId, documentId, input.fileBuffer);
+  } catch (error) {
+    throw new BadRequestError(
+      error instanceof Error ? error.message : 'Unable to persist submittal PDF to storage'
+    );
+  }
+
   const connection = await getConnection();
+  let stagingPlaceholderId = '';
 
   try {
     await connection.beginTransaction();
@@ -139,32 +217,14 @@ export async function ingestSubmittalPdf(
       uploadedBy: input.uploadedBy,
     });
 
-    const extracted = await processSubmittalPDF(input.fileBuffer);
-    const items = validatePdfDerivedItems(extracted);
-
-    const { stagingIds } = await StagingRepository.insertStagingBatch(
+    stagingPlaceholderId = await StagingRepository.insertProcessingPlaceholder(
       connection,
       input.projectId,
       documentId,
-      input.uploadedBy,
-      items
-    );
-
-    await SubmittalDocumentRepository.updateStatus(
-      connection,
-      documentId,
-      'AwaitingReview',
-      null
+      input.uploadedBy
     );
 
     await connection.commit();
-
-    return {
-      documentId,
-      processingStatus: 'AwaitingReview',
-      inserted: stagingIds.length,
-      stagingIds,
-    };
   } catch (error) {
     try {
       await connection.rollback();
@@ -172,8 +232,8 @@ export async function ingestSubmittalPdf(
       // Connection may already be rolled back.
     }
 
-    if (error instanceof BadRequestError || error instanceof ConflictError) {
-      throw error;
+    if (storedRelativePath) {
+      await deleteSubmittalPdf(storedRelativePath).catch(() => undefined);
     }
 
     if (isDuplicateEntryError(error)) {
@@ -181,10 +241,103 @@ export async function ingestSubmittalPdf(
         'Submittal file already ingested for this project (duplicate hash or title).'
       );
     }
-
-    const message = error instanceof Error ? error.message : 'PDF submittal parsing failed';
-    throw new BadRequestError(message);
+    throw error;
   } finally {
     connection.release();
+  }
+
+  return {
+    documentId,
+    processingStatus: 'Processing',
+    stagingPlaceholderId,
+    storedRelativePath,
+  };
+}
+
+/**
+ * Runs PDF extraction and staging insert off the HTTP request thread.
+ */
+export function startSubmittalPdfBackgroundJob(job: SubmittalIngestBackgroundJob): void {
+  setImmediate(() => {
+    void executeSubmittalPdfExtraction(job).catch((error) => {
+      console.error('[assemblyLineIngest] Unhandled background extraction error:', error);
+    });
+  });
+}
+
+async function executeSubmittalPdfExtraction(
+  job: SubmittalIngestBackgroundJob
+): Promise<void> {
+  try {
+    const fileBuffer = await readSubmittalPdf(job.storedRelativePath);
+    const extractedData = await processSubmittalPDF(fileBuffer);
+
+    console.log('================= RAW AI WORKER PAYLOAD =================');
+    console.log(JSON.stringify(extractedData, null, 2));
+    console.log('========================================================');
+
+    const items = validatePdfDerivedItems(extractedData);
+
+    const connection = await getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      const existing = await SubmittalDocumentRepository.findByIdWithConnection(
+        connection,
+        job.projectId,
+        job.documentId
+      );
+
+      if (!existing || existing.processingStatus !== 'Processing') {
+        await connection.rollback();
+        return;
+      }
+
+      await StagingRepository.deleteProcessingPlaceholdersByDocument(
+        connection,
+        job.projectId,
+        job.documentId
+      );
+
+      await StagingRepository.insertStagingBatch(
+        connection,
+        job.projectId,
+        job.documentId,
+        job.uploadedBy,
+        items
+      );
+
+      await SubmittalDocumentRepository.updateStatus(
+        connection,
+        job.documentId,
+        'AwaitingReview',
+        null
+      );
+
+      await connection.commit();
+    } catch (error) {
+      try {
+        await connection.rollback();
+      } catch {
+        // Connection may already be rolled back.
+      }
+
+      if (isDuplicateEntryError(error)) {
+        await markSubmittalIngestFailed(
+          job.documentId,
+          new ConflictError(
+            'Submittal file already ingested for this project (duplicate hash or title).'
+          )
+        );
+        return;
+      }
+
+      await markSubmittalIngestFailed(job.documentId, error);
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    await markSubmittalIngestFailed(job.documentId, error);
   }
 }

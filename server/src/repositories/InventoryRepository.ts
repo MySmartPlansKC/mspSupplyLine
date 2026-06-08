@@ -1,4 +1,6 @@
+import { randomUUID } from 'crypto';
 import { RowDataPacket } from 'mysql2';
+import type { PoolConnection } from 'mysql2/promise';
 import { query } from '../../config/database';
 
 export interface ProjectInventoryWithSpecs {
@@ -99,5 +101,39 @@ export class InventoryRepository {
     );
 
     return rows.map(mapInventorySpecsRow);
+  }
+
+  static async insertProjectInventory(
+    connection: PoolConnection,
+    input: {
+      projectId: number;
+      itemId: string;
+      quantity: number;
+      locationInBuilding: string;
+      sourceDocumentPath?: string | null;
+    }
+  ): Promise<{ inventoryId: string }> {
+    const inventoryId = randomUUID();
+
+    await connection.execute(
+      `INSERT INTO sl_ProjectInventory (
+        InventoryID,
+        ProjectID,
+        ItemID,
+        Quantity,
+        LocationInBuilding,
+        SourceDocumentPath
+      ) VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        inventoryId,
+        input.projectId,
+        input.itemId,
+        input.quantity,
+        input.locationInBuilding,
+        input.sourceDocumentPath ?? null,
+      ]
+    );
+
+    return { inventoryId };
   }
 }

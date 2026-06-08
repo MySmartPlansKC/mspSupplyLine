@@ -35,6 +35,10 @@ interface SaturnRefRow extends RowDataPacket {
   MspSaturnProjectRef: number;
 }
 
+const PROJECT_LIST_COLUMNS = `
+  ProjectID, ProjectName, ProjectCity, ProjectState, ProjectStatus, MspSaturnProjectRef
+`;
+
 const PROJECT_SELECT_COLUMNS = `
   ProjectID, ClientID, MspSaturnProjectRef, ProjectName, ProjectStatus,
   ProjectAddress, ProjectCity, ProjectState, ProjectZip, CountryCode, ProjectLocale,
@@ -42,6 +46,15 @@ const PROJECT_SELECT_COLUMNS = `
   ProjectManagerName, ProjectManagerEmail, ProjectManagerPhone,
   CreatedAt, UpdatedAt
 `;
+
+interface ProjectListRow extends RowDataPacket {
+  ProjectID: number;
+  ProjectName: string;
+  ProjectCity: string | null;
+  ProjectState: string | null;
+  ProjectStatus: string;
+  MspSaturnProjectRef: number | null;
+}
 
 export interface CreateProjectInput {
   clientId: string;
@@ -92,6 +105,29 @@ function mapProjectRow(row: ProjectRow): SlProject {
   };
 }
 
+function mapProjectListRow(row: ProjectListRow): SlProject {
+  return {
+    ProjectID: row.ProjectID,
+    ClientID: '',
+    MspSaturnProjectRef: row.MspSaturnProjectRef,
+    ProjectName: row.ProjectName,
+    ProjectStatus: row.ProjectStatus as SlProject['ProjectStatus'],
+    ProjectAddress: null,
+    ProjectCity: row.ProjectCity,
+    ProjectState: row.ProjectState,
+    ProjectZip: null,
+    CountryCode: 'US',
+    ProjectLocale: null,
+    FundingCompanyName: null,
+    PurchaseOrderNumber: null,
+    ProjectManagerName: null,
+    ProjectManagerEmail: null,
+    ProjectManagerPhone: null,
+    CreatedAt: new Date(0),
+    UpdatedAt: new Date(0),
+  };
+}
+
 export class ProjectRepository {
   static toProjectApiRecord(project: SlProject): ProjectApiRecord {
     return {
@@ -102,6 +138,17 @@ export class ProjectRepository {
       projectStatus: project.ProjectStatus,
       mspSaturnProjectRef: project.MspSaturnProjectRef,
     };
+  }
+
+  static async existsById(projectId: number): Promise<boolean> {
+    const rows = await query<AccessProbeRow[]>(
+      `SELECT 1 AS hasAccess
+       FROM sl_Projects
+       WHERE ProjectID = ?
+       LIMIT 1`,
+      [projectId]
+    );
+    return rows.length > 0;
   }
 
   static async findById(projectId: number): Promise<SlProject | null> {
@@ -282,21 +329,18 @@ export class ProjectRepository {
     role: UserRole
   ): Promise<SlProject[]> {
     if (isPlatformRole(role)) {
-      const rows = await query<ProjectRow[]>(
-        `SELECT ${PROJECT_SELECT_COLUMNS}
+      const rows = await query<ProjectListRow[]>(
+        `SELECT ${PROJECT_LIST_COLUMNS}
          FROM sl_Projects
          WHERE ProjectStatus = 'Active'
          ORDER BY ProjectName`
       );
-      return rows.map(mapProjectRow);
+      return rows.map(mapProjectListRow);
     }
 
-    const rows = await query<ProjectRow[]>(
-      `SELECT p.ProjectID, p.ClientID, p.MspSaturnProjectRef, p.ProjectName, p.ProjectStatus,
-              p.ProjectAddress, p.ProjectCity, p.ProjectState, p.ProjectZip, p.CountryCode,
-              p.ProjectLocale, p.FundingCompanyName, p.PurchaseOrderNumber,
-              p.ProjectManagerName, p.ProjectManagerEmail, p.ProjectManagerPhone,
-              p.CreatedAt, p.UpdatedAt
+    const rows = await query<ProjectListRow[]>(
+      `SELECT p.ProjectID, p.ProjectName, p.ProjectCity, p.ProjectState,
+              p.ProjectStatus, p.MspSaturnProjectRef
        FROM sl_Projects p
        INNER JOIN sl_UserProjectAccess upa ON upa.ProjectID = p.ProjectID
        WHERE upa.UserID = ? AND p.ProjectStatus = 'Active'
@@ -304,6 +348,6 @@ export class ProjectRepository {
       [userId]
     );
 
-    return rows.map(mapProjectRow);
+    return rows.map(mapProjectListRow);
   }
 }

@@ -6,11 +6,11 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { fetchWrapper, setFetchWrapperHandlers } from '../api/fetchWrapper';
-import LoadingIndicator from '../components/Common/LoadingIndicator';
+import { FetchWrapperError, fetchWrapper, setFetchWrapperHandlers } from '../api/fetchWrapper';
 
 const TOKEN_KEY = 'sl_token';
 const VIEW_MODE_KEY = 'sl_view_mode';
+export const AUTH_SERVER_NOTICE_KEY = 'sl_auth_server_notice';
 
 type ViewMode = 'admin' | 'client';
 const PLATFORM_ROLES = new Set(['MspAdmin', 'Admin', 'PIM']);
@@ -38,7 +38,6 @@ interface SessionResponse {
 interface AuthContextValue {
   user: SessionUser | null;
   token: string | null;
-  initializing: boolean;
   authenticated: boolean;
   effectiveRole: string | null;
   viewMode: ViewMode;
@@ -77,6 +76,35 @@ function tokenLooksExpired(token: string): boolean {
   return payload.exp * 1000 <= Date.now();
 }
 
+function sessionUserFromToken(token: string): SessionUser | null {
+  const payload = safeDecodeJwtPayload(token);
+  if (!payload) return null;
+
+  const userId = payload.sub;
+  const email = payload.email;
+  const role = payload.role;
+  const clientId = payload.clientId;
+
+  if (
+    typeof userId !== 'string' ||
+    typeof email !== 'string' ||
+    typeof role !== 'string' ||
+    typeof clientId !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    userId,
+    email,
+    role,
+    clientId,
+    firstName: null,
+    lastName: null,
+    preferredLocale: null,
+  };
+}
+
 function restoreViewModeFromStorage(): ViewMode {
   const savedMode = localStorage.getItem(VIEW_MODE_KEY);
   if (savedMode === 'client' || savedMode === 'admin') {
@@ -85,11 +113,31 @@ function restoreViewModeFromStorage(): ViewMode {
   return 'admin';
 }
 
+function readStoredSession(): { token: string | null; user: SessionUser | null } {
+  const stored = readTokenFromStorage();
+  if (!stored || tokenLooksExpired(stored)) {
+    if (stored) {
+      localStorage.removeItem(TOKEN_KEY);
+    }
+    return { token: null, user: null };
+  }
+
+  const user = sessionUserFromToken(stored);
+  if (!user) {
+    localStorage.removeItem(TOKEN_KEY);
+    return { token: null, user: null };
+  }
+
+  return { token: stored, user };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<SessionUser | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [initializing, setInitializing] = useState(true);
-  const [viewMode, setViewModeState] = useState<ViewMode>('admin');
+  const initialSession = readStoredSession();
+  const [user, setUser] = useState<SessionUser | null>(initialSession.user);
+  const [token, setToken] = useState<string | null>(initialSession.token);
+  const [viewMode, setViewModeState] = useState<ViewMode>(() =>
+    initialSession.token ? restoreViewModeFromStorage() : 'admin'
+  );
 
   const canImpersonateClientView = Boolean(user && PLATFORM_ROLES.has(user.role));
   const effectiveRole =
@@ -140,51 +188,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [logout]);
 
   useEffect(() => {
+    if (!token) {
+      return;
+    }
+
     let cancelled = false;
 
-    async function bootstrapSession() {
+    async function refreshSessionProfile() {
       try {
-        const stored = readTokenFromStorage();
-        if (!stored || tokenLooksExpired(stored)) {
-          if (stored) {
-            localStorage.removeItem(TOKEN_KEY);
-          }
-          return;
-        }
-
-        setToken(stored);
-        setViewModeState(restoreViewModeFromStorage());
-
         const session = await fetchWrapper<SessionResponse>({
           endpoint: 'auth/me',
           skipSessionDrop: true,
         });
 
+        if (!cancelled) {
+          setUser(session.user);
+        }
+      } catch (error) {
         if (cancelled) return;
-        setUser(session.user);
-      } catch {
-        if (cancelled) return;
-        localStorage.removeItem(TOKEN_KEY);
-        setToken(null);
-        setUser(null);
-        setViewModeState('admin');
-      } finally {
-        setInitializing(false);
+        if (error instanceof FetchWrapperError && error.status === 401) {
+          logout();
+        }
       }
     }
 
-    void bootstrapSession();
+    void refreshSessionProfile();
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [token, logout]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
       token,
-      initializing,
       authenticated: Boolean(user),
       effectiveRole,
       viewMode,
@@ -196,7 +234,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [
       user,
       token,
-      initializing,
       effectiveRole,
       viewMode,
       canImpersonateClientView,
@@ -206,14 +243,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     ]
   );
 
-  return (
-    <AuthContext.Provider value={value}>
-      {initializing ? (
-        <LoadingIndicator placement="overlay" spinnerSize="md" />
-      ) : null}
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextValue {

@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import AppShellHeader from '../components/Common/AppShellHeader';
 import AppShellSignOut from '../components/Common/AppShellSignOut';
-import ProjectBackLink from '../components/Common/ProjectBackLink';
-import ProjectSubNavTabs from '../components/Common/ProjectSubNavTabs';
+import ProjectPageToolbar from '../components/Common/ProjectPageToolbar';
 import { fetchWrapper } from '../api/fetchWrapper';
 import Button from '../components/Common/Button';
 import Card from '../components/Common/Card';
 import LoadingIndicator from '../components/Common/LoadingIndicator';
+import { useShowLoading } from '../context/DevLoadingPreviewContext';
 
 interface DependencyItem {
   relationshipId: string;
@@ -65,6 +65,7 @@ export default function CatalogView() {
   const { projectId = '' } = useParams();
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const showLoading = useShowLoading(loading);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -100,21 +101,21 @@ export default function CatalogView() {
           className="grid grid-cols-1 items-baseline gap-2 border-b border-slate-200/70 border-l-2 border-l-blue-600 p-3 transition-colors last:border-b-0 hover:bg-slate-50/50 lg:grid-cols-12"
         >
           <div className="space-y-1 lg:col-span-4">
-            <div className="flex items-center gap-2">
-              <span className="rounded border border-slate-200/70 bg-slate-100 px-1">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
+              <span className="w-fit rounded border border-slate-200/70 bg-slate-100 px-1.5 py-0.5 text-xs">
                 ID: {item.itemId.slice(0, 8)}
               </span>
-              <h3 className="font-semibold tracking-tight">
+              <h3 className="min-w-0 font-semibold tracking-tight break-words">
                 {item.manufacturer} &bull; {item.modelNumber}
               </h3>
             </div>
             {item.itemDescription ? (
-              <p className="line-clamp-2 leading-normal">{item.itemDescription}</p>
+              <p className="line-clamp-3 leading-normal sm:line-clamp-2">{item.itemDescription}</p>
             ) : null}
-            <div className="flex items-center gap-3 pt-0.5">
+            <div className="flex flex-col gap-0.5 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
               <span>Qty: {item.quantity}</span>
-              <span>|</span>
-              <span>Location: {item.locationInBuilding}</span>
+              <span className="hidden sm:inline">|</span>
+              <span className="break-words">Location: {item.locationInBuilding}</span>
             </div>
           </div>
 
@@ -142,7 +143,7 @@ export default function CatalogView() {
             {specEntries.length === 0 ? (
               <span className="italic">No parameters available</span>
             ) : (
-              <div className="grid max-h-24 grid-cols-2 gap-x-2 gap-y-0.5 overflow-y-auto pr-1">
+              <div className="grid max-h-32 grid-cols-1 gap-x-2 gap-y-0.5 overflow-y-auto pr-1 sm:max-h-24 sm:grid-cols-2">
                 {specEntries.map(([key, value]) => (
                   <div
                     key={key}
@@ -192,15 +193,8 @@ export default function CatalogView() {
           actions={<AppShellSignOut />}
         />
 
-        <ProjectSubNavTabs projectId={projectId} />
-
-        <ProjectBackLink />
-
-        {loading ? (
-          <LoadingIndicator
-            label="Aggregating multi-tenant registry assets..."
-            spinnerSize="sm"
-          />
+        {showLoading ? (
+          <LoadingIndicator label="Aggregating multi-tenant registry assets..." />
         ) : null}
 
         {error ? (
@@ -209,8 +203,12 @@ export default function CatalogView() {
           </div>
         ) : null}
 
-        {!loading && !error ? (
-          <Card
+        {!showLoading && !error ? (
+          <div className="sl-page-layout">
+            <section className="sl-page-main">
+              <ProjectPageToolbar projectId={projectId} />
+
+              <Card
             heading="Active Verified Inventory Ledger"
             subheading="System-of-record parameters for deployment tracking hardware rows."
             className="overflow-hidden"
@@ -231,7 +229,9 @@ export default function CatalogView() {
                 {rows}
               </div>
             )}
-          </Card>
+              </Card>
+            </section>
+          </div>
         ) : null}
       </div>
     </main>

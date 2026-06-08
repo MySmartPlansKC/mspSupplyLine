@@ -8,6 +8,7 @@ import {
 import { getProjectInventory } from '../controllers/inventoryController';
 import { deletePurgeTestDataHandler } from '../controllers/adminController';
 import {
+  approveProjectStagingItem,
   getProjectStaging,
   postProjectStaging,
 } from '../controllers/stagingController';
@@ -52,6 +53,13 @@ projectRoutes.post(
   verifyProjectAccess,
   optionalStagingPdfUpload,
   postProjectStaging
+);
+
+projectRoutes.post(
+  '/:projectId/staging/:stagingId/approve',
+  authenticateJwt,
+  verifyProjectAccess,
+  approveProjectStagingItem
 );
 
 projectRoutes.get(

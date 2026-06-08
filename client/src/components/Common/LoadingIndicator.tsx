@@ -1,63 +1,93 @@
 import { Spinner } from './Spinner';
 
+export type LoadingIndicatorTone = 'light' | 'dark';
+
 export interface LoadingIndicatorProps {
   label?: string;
-  /** overlay = session bootstrap; inline = page/section fetch rows */
-  placement?: 'overlay' | 'inline';
-  spinnerSize?: 'sm' | 'md';
+  /** overlay = full-screen; inline = centered page row; embedded = in-place (e.g. drop zone) */
+  placement?: 'overlay' | 'inline' | 'embedded';
+  /** stack = spinner above label; row = spinner beside label (default row for embedded) */
+  layout?: 'stack' | 'row';
+  tone?: LoadingIndicatorTone;
   className?: string;
 }
+
+const toneStyles: Record<
+  LoadingIndicatorTone,
+  { box: string; well: string; label: string }
+> = {
+  light: {
+    box: 'rounded-lg border border-slate-300/80 bg-white px-5 py-4 shadow-sm',
+    well: 'bg-white',
+    label: 'text-sm font-semibold tracking-tight text-slate-600',
+  },
+  dark: {
+    box: 'rounded-lg border border-slate-600/80 bg-slate-900 px-5 py-4 shadow-sm',
+    well: 'bg-slate-900',
+    label: 'text-sm font-semibold tracking-tight text-slate-300',
+  },
+};
 
 function joinClasses(...values: Array<string | undefined | false>): string {
   return values.filter(Boolean).join(' ');
 }
 
-function LoadingIndicatorContent({
-  label,
-  spinnerSize = 'md',
-}: Pick<LoadingIndicatorProps, 'label' | 'spinnerSize'>) {
-  return (
-    <div className="flex items-center justify-center gap-3">
-      <div className="flex items-center justify-center rounded border border-slate-800 bg-slate-900 px-4 py-2.5 shadow-md">
-        <Spinner size={spinnerSize} variant="brand" wellClassName="bg-slate-900" />
-      </div>
-      {label ? (
-        <span className="text-sm font-semibold tracking-tight text-slate-600">{label}</span>
-      ) : null}
-    </div>
-  );
-}
-
 export default function LoadingIndicator({
   label,
   placement = 'inline',
-  spinnerSize = 'md',
+  layout,
+  tone = 'light',
   className = '',
 }: LoadingIndicatorProps) {
+  const styles = toneStyles[tone];
+  const resolvedLayout = layout ?? (placement === 'embedded' ? 'row' : 'stack');
+  const spinnerSize = placement === 'embedded' ? 'sm' : 'md';
+
+  const card = (
+    <div
+      className={joinClasses(
+        resolvedLayout === 'row'
+          ? 'flex flex-row items-center gap-2.5 px-3.5 py-2.5'
+          : 'flex flex-col items-center gap-2.5 px-5 py-4',
+        styles.box
+      )}
+    >
+      <Spinner size={spinnerSize} variant="brand" wellClassName={styles.well} />
+      {label ? <span className={styles.label}>{label}</span> : null}
+    </div>
+  );
+
   if (placement === 'overlay') {
     return (
       <div
-        className="fixed inset-0 z-50 bg-zinc-200/80 backdrop-blur-[1px]"
+        className="fixed inset-0 z-50 grid place-items-center bg-zinc-200/80 p-4 backdrop-blur-[1px]"
         aria-busy="true"
         aria-label={label ?? 'Loading'}
       >
-        <div className="flex h-16 w-full items-center justify-center border-b border-slate-300/70 bg-white/95 shadow-sm">
-          <LoadingIndicatorContent label={label} spinnerSize={spinnerSize} />
-        </div>
+        {card}
+      </div>
+    );
+  }
+
+  if (placement === 'embedded') {
+    return (
+      <div
+        className={joinClasses('flex w-full justify-center', className)}
+        aria-busy="true"
+        aria-label={label ?? 'Loading'}
+      >
+        {card}
       </div>
     );
   }
 
   return (
     <div
-      className={joinClasses(
-        'flex h-14 w-full items-center justify-center rounded border border-slate-300/70 bg-white/95 px-4 shadow-sm',
-        className
-      )}
+      className={joinClasses('flex w-full items-center justify-center py-12', className)}
       aria-busy="true"
       aria-label={label ?? 'Loading'}
     >
-      <LoadingIndicatorContent label={label} spinnerSize={spinnerSize} />
+      {card}
     </div>
   );
 }
